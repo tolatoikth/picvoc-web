@@ -257,13 +257,47 @@
       <!-- Messages Stream -->
       <div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 bg-white"></div>
 
-      <!-- Input Form -->
-      <form id="chat-form" class="p-2.5 border-t border-slate-200 bg-slate-50 flex items-center gap-2 shrink-0">
+      <!-- Voice Listening Indicator -->
+      <div id="chat-voice-status" class="hidden px-3 py-1.5 bg-rose-50 border-t border-rose-200 flex items-center justify-between gap-2 shrink-0">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping shrink-0"></span>
+          <span id="chat-voice-status-text" class="text-[11px] font-bold text-rose-700 truncate">Đang nghe tiếng Anh... Hãy nói vào micro</span>
+        </div>
+        <button data-action="chat-toggle-voice" type="button" class="text-[11px] font-bold text-rose-600 hover:text-rose-800 shrink-0">Dừng</button>
+      </div>
+
+      <!-- Reply Suggestions Drawer (toggled by Left Suggest Button) -->
+      <div id="chat-suggest-popover" class="hidden px-3 py-2 bg-amber-50/80 border-t border-amber-200/80 space-y-1.5 shrink-0">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+            <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-600"></i>
+            <span>Gợi ý câu trả lời</span>
+          </span>
+          <div class="flex items-center gap-2">
+            <button data-action="chat-refresh-suggestions" type="button" class="text-[10px] font-bold text-emerald-700 hover:text-emerald-800">Đổi gợi ý</button>
+            <button data-action="chat-toggle-suggestions" type="button" class="text-slate-400 hover:text-slate-600" aria-label="Đóng gợi ý">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+        <div id="chat-suggest-list" class="flex flex-col gap-1"></div>
+      </div>
+
+      <!-- Messenger-Style Input Bar: [Suggest] [Text Input] [Voice Mic] [Send] -->
+      <form id="chat-form" class="px-2.5 py-2 border-t border-slate-200 bg-white flex items-center gap-1.5 shrink-0">
+        <button id="chat-suggest-btn" data-action="chat-toggle-suggestions" type="button" title="Gợi ý câu trả lời"
+          class="w-9 h-9 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0 transition">
+          <i data-lucide="lightbulb" class="w-4 h-4"></i>
+        </button>
         <input id="chat-input" type="text" autocomplete="off"
-          placeholder="Nhập tiếng Anh hoặc hỏi cách nói..."
-          class="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs sm:text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
-        <button id="chat-send-btn" type="submit"
-          class="w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 transition">
+          placeholder="Nhập tin nhắn..."
+          class="flex-1 min-w-0 px-3.5 py-2 rounded-full bg-slate-100 focus:bg-white border border-slate-200/80 text-xs sm:text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition" />
+        <button id="chat-voice-btn" data-action="chat-toggle-voice" type="button" title="Nói tiếng Anh bằng giọng nói"
+          class="w-9 h-9 rounded-full bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200/80 flex items-center justify-center shrink-0 transition">
+          <i data-lucide="mic" class="w-4 h-4"></i>
+        </button>
+        <button id="chat-send-btn" type="submit" title="Gửi tin nhắn"
+          class="w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 transition shadow-xs">
           <i data-lucide="send" class="w-4 h-4"></i>
         </button>
       </form>
@@ -4071,6 +4105,31 @@
         sendChatMessage(actEl.dataset.prompt);
         return;
       }
+      if (action === 'chat-toggle-suggestions') {
+        toggleChatSuggestions();
+        return;
+      }
+      if (action === 'chat-refresh-suggestions') {
+        refreshChatSuggestions(true);
+        return;
+      }
+      if (action === 'chat-pick-suggestion') {
+        const txt = actEl.dataset.text || '';
+        const inp = document.getElementById('chat-input');
+        if (inp && txt) {
+          inp.value = txt;
+          inp.focus();
+        }
+        chatState.suggestOpen = false;
+        const pop = document.getElementById('chat-suggest-popover');
+        if (pop) pop.classList.add('hidden');
+        updateSuggestButtonVisual();
+        return;
+      }
+      if (action === 'chat-toggle-voice') {
+        toggleChatVoice();
+        return;
+      }
       if (action === 'ob-save') {
         state.profile = {
           nickname: (state.obDraftNickname || '').trim(),
@@ -4095,6 +4154,10 @@
       topicId: '',
       topicPickerOpen: false,
       keyDrawerOpen: false,
+      suggestOpen: false,
+      suggestSeed: 0,
+      listening: false,
+      recognition: null,
       busy: false,
       messages: [],
       apiKey: (function() { try { return localStorage.getItem(GEMINI_KEY_STORAGE) || ''; } catch (e) { return ''; } })()
@@ -4347,6 +4410,182 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
       renderChatMessages();
     }
 
+    // Messenger-style Reply Suggestions & Voice Recognition
+    function updateSuggestButtonVisual() {
+      const btn = document.getElementById('chat-suggest-btn');
+      if (!btn) return;
+      if (chatState.suggestOpen) {
+        btn.className = 'w-9 h-9 rounded-full bg-amber-500 text-white border border-amber-500 flex items-center justify-center shrink-0 transition shadow-xs';
+      } else {
+        btn.className = 'w-9 h-9 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0 transition';
+      }
+    }
+
+    function buildLocalReplySuggestions() {
+      const t = chatState.topicId ? getTopicObj(chatState.topicId) : null;
+      const words = t ? getWordsByTopic(t.id) : [];
+      const seed = chatState.suggestSeed || 0;
+      const pool = [];
+
+      if (t && t.id === 'education') {
+        pool.push(
+          { en: 'I usually study in the library because it is quiet.', vi: 'Mình thường học ở thư viện vì yên tĩnh.' },
+          { en: 'I have an important assignment due this week.', vi: 'Mình có một bài tập quan trọng đến hạn tuần này.' },
+          { en: 'I enjoy attending interesting lectures at university.', vi: 'Mình thích tham dự các bài giảng thú vị ở đại học.' },
+          { en: 'Could you help me say "giải bài toán" naturally in English?', vi: 'Nhờ AI hướng dẫn cách nói tự nhiên.' },
+          { en: 'I am preparing for my upcoming exam.', vi: 'Mình đang ôn tập cho kỳ thi sắp tới.' }
+        );
+      } else if (t && t.id === 'polite') {
+        pool.push(
+          { en: 'I sincerely apologize for being late today.', vi: 'Mình thành thật xin lỗi vì hôm nay đến muộn.' },
+          { en: 'Thank you so much for your kind hospitality.', vi: 'Cảm ơn bạn rất nhiều vì sự hiếu khách.' },
+          { en: 'Would you mind helping me with this for a moment?', vi: 'Bạn có phiền giúp mình việc này một chút không?' },
+          { en: 'I really appreciate your thoughtful advice.', vi: 'Mình rất trân trọng lời khuyên chu đáo của bạn.' }
+        );
+      } else if (t) {
+        if (words.length >= 2) {
+          pool.push(
+            { en: `I am learning the word "${words[0].word}" today.`, vi: `Đặt câu với từ "${words[0].word}" (${words[0].vi}).` },
+            { en: `Could you give me an example sentence with "${words[1].word}"?`, vi: `Xin câu ví dụ với từ "${words[1].word}".` }
+          );
+        }
+        pool.push(
+          { en: `I really enjoy talking about ${t.name.toLowerCase()}.`, vi: `Mình rất thích nói về chủ đề ${t.viName}.` },
+          { en: `What are 3 useful words I should know for ${t.name.toLowerCase()}?`, vi: `Hỏi 3 từ hữu ích về ${t.viName}.` },
+          { en: `Can you ask me a simple question about ${t.name.toLowerCase()}?`, vi: `Nhờ AI đặt 1 câu hỏi đơn giản để luyện trả lời.` },
+          { en: `How can I describe my experience with ${t.name.toLowerCase()} naturally?`, vi: `Hỏi cách diễn đạt trải nghiệm thật tự nhiên.` }
+        );
+      } else {
+        pool.push(
+          { en: 'Hi! Can we practice daily English conversation together?', vi: 'Chào bạn! Mình luyện giao tiếp tiếng Anh hằng ngày nhé?' },
+          { en: 'How do I say "Tôi thích giải toán" naturally in English?', vi: 'Hỏi cách diễn đạt tự nhiên bằng tiếng Anh.' },
+          { en: 'Ask me a short question and correct my grammar if needed.', vi: 'Nhờ AI hỏi 1 câu ngắn và sửa ngữ pháp giúp.' },
+          { en: 'Let us practice speaking with simple vocabulary first.', vi: 'Bắt đầu luyện nói với từ vựng đơn giản trước.' }
+        );
+      }
+
+      const out = [];
+      for (let i = 0; i < Math.min(3, pool.length); i++) {
+        out.push(pool[(seed + i) % pool.length]);
+      }
+      return out;
+    }
+
+    function renderChatSuggestions(items) {
+      const list = document.getElementById('chat-suggest-list');
+      if (!list) return;
+      list.innerHTML = items.map(item => `
+        <button data-action="chat-pick-suggestion" data-text="${escapeAttr(item.en)}" type="button"
+          class="w-full text-left px-2.5 py-1.5 rounded-xl bg-white hover:bg-emerald-50 border border-amber-200/80 hover:border-emerald-300 transition">
+          <div class="text-[11px] font-bold text-slate-800 leading-snug">${escapeHtml(item.en)}</div>
+          ${item.vi ? `<div class="text-[10px] text-slate-500 truncate">${escapeHtml(item.vi)}</div>` : ''}
+        </button>
+      `).join('');
+    }
+
+    function refreshChatSuggestions(advance) {
+      if (advance) chatState.suggestSeed = (chatState.suggestSeed || 0) + 1;
+      renderChatSuggestions(buildLocalReplySuggestions());
+    }
+
+    function toggleChatSuggestions() {
+      chatState.suggestOpen = !chatState.suggestOpen;
+      const pop = document.getElementById('chat-suggest-popover');
+      if (pop) pop.classList.toggle('hidden', !chatState.suggestOpen);
+      updateSuggestButtonVisual();
+      if (chatState.suggestOpen) {
+        refreshChatSuggestions(false);
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+
+    function updateVoiceButtonVisual() {
+      const btn = document.getElementById('chat-voice-btn');
+      const statusEl = document.getElementById('chat-voice-status');
+      const statusText = document.getElementById('chat-voice-status-text');
+      if (btn) {
+        if (chatState.listening) {
+          btn.className = 'w-9 h-9 rounded-full bg-rose-500 hover:bg-rose-600 text-white border border-rose-500 flex items-center justify-center shrink-0 transition animate-pulse shadow-xs';
+          btn.innerHTML = '<i data-lucide="square" class="w-3.5 h-3.5"></i>';
+          btn.title = 'Đang nghe... Bấm để dừng';
+        } else {
+          btn.className = 'w-9 h-9 rounded-full bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200/80 flex items-center justify-center shrink-0 transition';
+          btn.innerHTML = '<i data-lucide="mic" class="w-4 h-4"></i>';
+          btn.title = 'Nói tiếng Anh bằng giọng nói';
+        }
+      }
+      if (statusEl) statusEl.classList.toggle('hidden', !chatState.listening);
+      if (statusText && chatState.listening) {
+        statusText.textContent = `Đang nghe tiếng Anh (${state.accent || 'US'})... Hãy nói vào micro`;
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function stopChatVoice() {
+      chatState.listening = false;
+      if (chatState.recognition) {
+        try { chatState.recognition.stop(); } catch (e) {}
+        chatState.recognition = null;
+      }
+      updateVoiceButtonVisual();
+    }
+
+    function toggleChatVoice() {
+      if (chatState.listening) {
+        stopChatVoice();
+        return;
+      }
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        showToast('Trình duyệt hiện tại chưa hỗ trợ nhận diện giọng nói. Hãy dùng Chrome, Edge hoặc Cốc Cốc.');
+        return;
+      }
+      const inp = document.getElementById('chat-input');
+      const baseText = inp ? inp.value.trim() : '';
+      try {
+        const rec = new SpeechRec();
+        rec.lang = state.accent === 'UK' ? 'en-GB' : 'en-US';
+        rec.interimResults = true;
+        rec.continuous = false;
+        rec.maxAlternatives = 1;
+
+        rec.onstart = () => {
+          chatState.listening = true;
+          updateVoiceButtonVisual();
+        };
+        rec.onresult = (event) => {
+          let transcript = '';
+          for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          if (inp) {
+            inp.value = (baseText ? baseText + ' ' : '') + transcript.trim();
+            inp.focus();
+          }
+        };
+        rec.onerror = (ev) => {
+          const err = ev && ev.error ? ev.error : '';
+          if (err === 'not-allowed' || err === 'service-not-allowed') {
+            showToast('Bạn cần cho phép quyền Micro trên trình duyệt để dùng giọng nói.');
+          } else if (err !== 'aborted' && err !== 'no-speech') {
+            showToast('Không nghe rõ giọng nói, bạn thử bấm lại micro nhé.');
+          }
+          stopChatVoice();
+        };
+        rec.onend = () => {
+          chatState.listening = false;
+          chatState.recognition = null;
+          updateVoiceButtonVisual();
+        };
+
+        chatState.recognition = rec;
+        rec.start();
+      } catch (e) {
+        showToast('Không thể bật micro lúc này, bạn thử lại nhé.');
+        stopChatVoice();
+      }
+    }
+
     // Bind Corner Drag-to-Resize on Top-Left Handle
     function initChatResizeHandle() {
       const handle = document.getElementById('mascot-resize-handle');
@@ -4406,6 +4645,7 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
           ev.preventDefault();
           const inp = document.getElementById('chat-input');
           if (!inp) return;
+          if (chatState.listening) stopChatVoice();
           const val = inp.value.trim();
           if (!val) return;
           inp.value = '';
