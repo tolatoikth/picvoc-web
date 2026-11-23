@@ -79,24 +79,28 @@
       </button>
 
       <!-- Desktop Nav -->
-      <nav class="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl" aria-label="Điều hướng chính">
-        <button data-nav="home" type="button" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 transition">
+      <nav class="hidden md:flex items-center gap-0.5 bg-slate-100 p-1 rounded-xl" aria-label="Điều hướng chính">
+        <button data-nav="home" type="button" class="nav-btn px-2.5 py-1.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition">
           <i data-lucide="layout-grid" class="w-4 h-4"></i>
           <span>Chủ đề</span>
         </button>
-        <button data-nav="learn" type="button" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 transition">
+        <button data-nav="learn" type="button" class="nav-btn px-2.5 py-1.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition">
           <i data-lucide="book-open" class="w-4 h-4"></i>
           <span>Học từ</span>
         </button>
-        <button data-nav="flashcard" type="button" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 transition">
+        <button data-nav="flashcard" type="button" class="nav-btn px-2.5 py-1.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition">
           <i data-lucide="layers" class="w-4 h-4"></i>
           <span>Flashcard</span>
         </button>
-        <button data-nav="quiz" type="button" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 transition">
+        <button data-nav="dictionary" type="button" class="nav-btn px-2.5 py-1.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition">
+          <i data-lucide="book-marked" class="w-4 h-4"></i>
+          <span>Từ điển</span>
+        </button>
+        <button data-nav="quiz" type="button" class="nav-btn px-2.5 py-1.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition">
           <i data-lucide="help-circle" class="w-4 h-4"></i>
           <span>Kiểm tra</span>
         </button>
-        <button data-nav="favorites" type="button" class="nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 transition">
+        <button data-nav="favorites" type="button" class="nav-btn px-2.5 py-1.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition">
           <i data-lucide="star" class="w-4 h-4"></i>
           <span>Yêu thích</span>
         </button>
@@ -128,26 +132,30 @@
   </main>
 
   <!-- Mobile Bottom Navigation -->
-  <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 px-2 py-1.5 grid grid-cols-5 gap-1" aria-label="Điều hướng di động">
-    <button data-nav="home" type="button" class="mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[11px] font-semibold">
-      <i data-lucide="layout-grid" class="w-5 h-5 mb-0.5"></i>
+  <nav class="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white/95 backdrop-blur border-t border-slate-200 px-1.5 py-1.5 grid grid-cols-6 gap-0.5" aria-label="Điều hướng di động">
+    <button data-nav="home" type="button" class="mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[10px] font-semibold">
+      <i data-lucide="layout-grid" class="w-4 h-4 mb-0.5"></i>
       <span>Chủ đề</span>
     </button>
-    <button data-nav="learn" type="button" class="mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[11px] font-semibold">
-      <i data-lucide="book-open" class="w-5 h-5 mb-0.5"></i>
+    <button data-nav="learn" type="button" class="mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[10px] font-semibold">
+      <i data-lucide="book-open" class="w-4 h-4 mb-0.5"></i>
       <span>Học từ</span>
     </button>
-    <button data-nav="flashcard" type="button" class="mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[11px] font-semibold">
-      <i data-lucide="layers" class="w-5 h-5 mb-0.5"></i>
-      <span>Flashcard</span>
+    <button data-nav="flashcard" type="button" class="mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[10px] font-semibold">
+      <i data-lucide="layers" class="w-4 h-4 mb-0.5"></i>
+      <span>Thẻ</span>
     </button>
-    <button data-nav="quiz" type="button" class="mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[11px] font-semibold">
-      <i data-lucide="help-circle" class="w-5 h-5 mb-0.5"></i>
-      <span>Kiểm tra</span>
+    <button data-nav="dictionary" type="button" class="mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[10px] font-semibold">
+      <i data-lucide="book-marked" class="w-4 h-4 mb-0.5"></i>
+      <span>Từ điển</span>
     </button>
-    <button data-nav="favorites" type="button" class="mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[11px] font-semibold">
-      <i data-lucide="star" class="w-5 h-5 mb-0.5"></i>
-      <span>Yêu thích</span>
+    <button data-nav="quiz" type="button" class="mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[10px] font-semibold">
+      <i data-lucide="help-circle" class="w-4 h-4 mb-0.5"></i>
+      <span>Test</span>
+    </button>
+    <button data-nav="favorites" type="button" class="mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[10px] font-semibold">
+      <i data-lucide="star" class="w-4 h-4 mb-0.5"></i>
+      <span>Thích</span>
     </button>
   </nav>
 
@@ -345,7 +353,8 @@
           preferredUKVoice: state.preferredUKVoice,
           useRealDictAudio: state.useRealDictAudio,
           profile: state.profile,
-          topicStates: state.topicStates
+          topicStates: state.topicStates,
+          dictHistory: state.dictHistory
         }));
       } catch (e) {}
     }
@@ -382,6 +391,12 @@
       topicSearch: '',
       favSubTab: 'words', // words | topics
       highlightWordId: null,
+      dictQuery: '',
+      dictLoading: false,
+      dictError: '',
+      dictResult: null,
+      dictViTranslation: '',
+      dictHistory: Array.isArray(saved.dictHistory) ? saved.dictHistory : ['scholarship', 'hospitality', 'resilient', 'courtesy'],
       obDraftNickname: '',
       obDraftMascot: 'cat',
       obDraftGoal: 10,
@@ -959,12 +974,12 @@
     function updateHeaderUI() {
       document.querySelectorAll('.nav-btn').forEach(btn => {
         const active = btn.dataset.nav === state.view;
-        btn.className = 'nav-btn px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 transition ' +
+        btn.className = 'nav-btn px-2.5 py-1.5 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 transition ' +
           (active ? 'bg-white text-emerald-700 shadow-xs' : 'text-slate-600 hover:text-slate-900');
       });
       document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
         const active = btn.dataset.nav === state.view;
-        btn.className = 'mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[11px] font-semibold transition ' +
+        btn.className = 'mobile-nav-btn flex flex-col items-center justify-center py-1 rounded-lg text-[10px] font-semibold transition ' +
           (active ? 'text-emerald-600 bg-emerald-50' : 'text-slate-500');
       });
       document.getElementById('accent-label').textContent = state.accent;
@@ -1683,6 +1698,310 @@
               Tiếp <i data-lucide="chevron-right" class="w-4 h-4"></i>
             </button>
           </div>
+        </section>
+      `;
+    }
+
+    // ==================== CAMBRIDGE-STYLE DICTIONARY VIEW ====================
+    async function lookupCambridgeDictionary(rawWord) {
+      const q = String(rawWord || '').trim().toLowerCase();
+      if (!q) return;
+      state.dictQuery = q;
+      state.dictLoading = true;
+      state.dictError = '';
+      state.dictResult = null;
+      state.dictViTranslation = '';
+
+      // Update recent lookup history
+      state.dictHistory = [q, ...state.dictHistory.filter(x => x !== q)].slice(0, 8);
+      saveState();
+      render();
+
+      const localMatch = VOCAB.find(w => w.word.toLowerCase() === q);
+
+      try {
+        const [dictRes, viRes] = await Promise.all([
+          fetch('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(q))
+            .then(r => r.ok ? r.json() : null)
+            .catch(() => null),
+          localMatch
+            ? Promise.resolve(localMatch.vi)
+            : fetch('https://api.mymemory.translated.net/get?q=' + encodeURIComponent(q) + '&langpair=en|vi')
+                .then(r => r.ok ? r.json() : null)
+                .then(d => (d && d.responseData && d.responseData.translatedText) ? d.responseData.translatedText : '')
+                .catch(() => '')
+        ]);
+
+        state.dictViTranslation = viRes || '';
+
+        if (Array.isArray(dictRes) && dictRes.length) {
+          // Parse UK/US IPA & audio cleanly like Cambridge Dictionary
+          let ukIpa = '', usIpa = '', ukAudio = '', usAudio = '', anyIpa = '', anyAudio = '';
+          const meanings = [];
+          dictRes.forEach(entry => {
+            if (Array.isArray(entry.phonetics)) {
+              entry.phonetics.forEach(p => {
+                const txt = (p.text || '').trim();
+                const aud = (p.audio || '').trim();
+                if (txt && !anyIpa) anyIpa = txt;
+                if (aud && !anyAudio) anyAudio = aud;
+                if (aud.toLowerCase().includes('-uk')) {
+                  if (!ukAudio) ukAudio = aud;
+                  if (txt && !ukIpa) ukIpa = txt;
+                }
+                if (aud.toLowerCase().includes('-us')) {
+                  if (!usAudio) usAudio = aud;
+                  if (txt && !usIpa) usIpa = txt;
+                }
+              });
+            }
+            if (Array.isArray(entry.meanings)) {
+              entry.meanings.forEach(m => meanings.push(m));
+            }
+          });
+
+          state.dictResult = {
+            word: dictRes[0].word || q,
+            ukIpa: ukIpa || (localMatch ? localMatch.ipaUK : '') || anyIpa,
+            usIpa: usIpa || (localMatch ? localMatch.ipaUS : '') || anyIpa,
+            ukAudio: ukAudio || anyAudio,
+            usAudio: usAudio || anyAudio,
+            meanings,
+            localMatch
+          };
+        } else if (localMatch) {
+          state.dictResult = {
+            word: localMatch.word,
+            ukIpa: localMatch.ipaUK,
+            usIpa: localMatch.ipaUS,
+            ukAudio: localMatch.audioUK || '',
+            usAudio: localMatch.audioUS || '',
+            meanings: [{
+              partOfSpeech: localMatch.pos,
+              definitions: [{ definition: localMatch.enDef, example: localMatch.example }],
+              synonyms: localMatch.collocations || [],
+              antonyms: []
+            }],
+            localMatch
+          };
+        } else {
+          state.dictError = `Không tìm thấy mục từ "${q}" trong kho tra cứu trực tiếp. Bạn có thể bấm nút bên dưới để mở thẳng trên trang Cambridge Dictionary gốc.`;
+        }
+      } catch (err) {
+        state.dictError = 'Không thể kết nối máy chủ từ điển lúc này. Bạn có thể mở thẳng trang Cambridge Dictionary gốc bên dưới.';
+      }
+
+      state.dictLoading = false;
+      render();
+    }
+
+    function renderDictionary() {
+      const q = state.dictQuery.trim();
+      const slug = encodeURIComponent(q.replace(/\s+/g, '-'));
+      const camEnUrl = q ? `https://dictionary.cambridge.org/dictionary/english/${slug}` : 'https://dictionary.cambridge.org/';
+      const camViUrl = q ? `https://dictionary.cambridge.org/dictionary/english-vietnamese/${slug}` : 'https://dictionary.cambridge.org/dictionary/english-vietnamese/';
+
+      let bodyHtml = '';
+
+      if (state.dictLoading) {
+        bodyHtml = `
+          <div class="bg-white rounded-3xl border border-slate-200 p-10 text-center space-y-3">
+            <div class="w-9 h-9 border-4 border-sky-200 border-t-sky-600 rounded-full animate-spin mx-auto"></div>
+            <p class="text-sm font-semibold text-slate-600">Đang tra từ "${escapeHtml(q)}" chuẩn Cambridge...</p>
+          </div>
+        `;
+      } else if (state.dictError) {
+        bodyHtml = `
+          <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 text-center space-y-4">
+            <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mx-auto">
+              <i data-lucide="book-marked" class="w-6 h-6"></i>
+            </div>
+            <p class="text-sm text-slate-600 max-w-md mx-auto">${escapeHtml(state.dictError)}</p>
+            <div class="flex flex-wrap items-center justify-center gap-2.5">
+              <a href="${camEnUrl}" target="_blank" rel="noopener noreferrer"
+                class="px-4 py-2.5 rounded-xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold inline-flex items-center gap-1.5 transition">
+                <span>Mở Cambridge Anh - Anh</span>
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+              </a>
+              <a href="${camViUrl}" target="_blank" rel="noopener noreferrer"
+                class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold inline-flex items-center gap-1.5 transition">
+                <span>Mở Cambridge Anh - Việt</span>
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+              </a>
+            </div>
+          </div>
+        `;
+      } else if (state.dictResult) {
+        const r = state.dictResult;
+        bodyHtml = `
+          <article class="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden animate-pop">
+            <!-- Cambridge-style Navy/Blue Top Accent Header -->
+            <div class="bg-gradient-to-r from-[#1d2a57] to-[#263870] text-white p-5 sm:p-6">
+              <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight">${escapeHtml(r.word)}</h2>
+                    ${r.localMatch ? `
+                      <button data-action="open-modal" data-id="${escapeAttr(r.localMatch.id)}" type="button"
+                        class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/25 text-emerald-200 border border-emerald-400/40 hover:bg-emerald-500/35 transition">
+                        Có trong KaDoc (${escapeHtml(getTopicObj(r.localMatch.topic).name)})
+                      </button>
+                    ` : ''}
+                  </div>
+                  ${state.dictViTranslation ? `
+                    <p class="text-base font-bold text-amber-300 mt-1">${escapeHtml(state.dictViTranslation)}</p>
+                  ` : ''}
+
+                  <!-- Iconic Cambridge UK (Blue) & US (Red) Pronunciation Badges -->
+                  <div class="flex flex-wrap items-center gap-3 mt-3.5">
+                    <button data-action="dict-play-audio" data-accent="UK" data-url="${escapeAttr(r.ukAudio)}" data-word="${escapeAttr(r.word)}" type="button"
+                      class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 transition">
+                      <span class="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-sky-500 text-white">UK</span>
+                      <i data-lucide="volume-2" class="w-4 h-4 text-sky-300"></i>
+                      <span class="text-xs font-medium text-slate-100">${escapeHtml(r.ukIpa || 'Nghe UK')}</span>
+                    </button>
+                    <button data-action="dict-play-audio" data-accent="US" data-url="${escapeAttr(r.usAudio)}" data-word="${escapeAttr(r.word)}" type="button"
+                      class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 transition">
+                      <span class="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-rose-500 text-white">US</span>
+                      <i data-lucide="volume-2" class="w-4 h-4 text-rose-300"></i>
+                      <span class="text-xs font-medium text-slate-100">${escapeHtml(r.usIpa || 'Nghe US')}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Direct Official Cambridge Dictionary Links -->
+                <div class="flex sm:flex-col gap-2 shrink-0">
+                  <a href="${camEnUrl}" target="_blank" rel="noopener noreferrer"
+                    class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold inline-flex items-center justify-center gap-1.5 transition">
+                    <span>Cambridge EN</span>
+                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                  </a>
+                  <a href="${camViUrl}" target="_blank" rel="noopener noreferrer"
+                    class="px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 transition">
+                    <span>Cambridge Anh-Việt</span>
+                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cambridge-style Sense Blocks -->
+            <div class="p-5 sm:p-6 divide-y divide-slate-100 space-y-5">
+              ${r.meanings.map((m, mi) => `
+                <div class="${mi > 0 ? 'pt-5' : ''} space-y-3">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-[#1d2a57]/10 text-[#1d2a57]">
+                      ${escapeHtml(m.partOfSpeech || 'meaning')}
+                    </span>
+                  </div>
+
+                  <div class="space-y-3.5 pl-3 border-l-3 border-sky-500">
+                    ${(m.definitions || []).slice(0, 5).map((def, di) => `
+                      <div class="space-y-1.5">
+                        <p class="text-sm font-semibold text-slate-900 leading-relaxed">
+                          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold mr-1.5">${di + 1}</span>
+                          ${escapeHtml(def.definition)}
+                        </p>
+                        ${def.example ? `
+                          <div class="ml-6 flex items-start justify-between gap-2 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
+                            <p class="text-xs italic text-slate-600">"${escapeHtml(def.example)}"</p>
+                            <button data-action="speak-word" data-text="${escapeAttr(def.example)}" type="button" title="Nghe câu ví dụ"
+                              class="text-sky-700 hover:text-sky-900 shrink-0 p-0.5">
+                              <i data-lucide="volume-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                          </div>
+                        ` : ''}
+                      </div>
+                    `).join('')}
+                  </div>
+
+                  ${Array.isArray(m.synonyms) && m.synonyms.length ? `
+                    <div class="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span class="text-[11px] font-bold text-slate-400 uppercase mr-1">Đồng nghĩa:</span>
+                      ${m.synonyms.slice(0, 8).map(syn => `
+                        <button data-action="dict-quick-lookup" data-word="${escapeAttr(syn)}" type="button"
+                          class="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 text-xs font-semibold transition">
+                          ${escapeHtml(syn)}
+                        </button>
+                      `).join('')}
+                    </div>
+                  ` : ''}
+
+                  ${Array.isArray(m.antonyms) && m.antonyms.length ? `
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      <span class="text-[11px] font-bold text-slate-400 uppercase mr-1">Trái nghĩa:</span>
+                      ${m.antonyms.slice(0, 6).map(ant => `
+                        <button data-action="dict-quick-lookup" data-word="${escapeAttr(ant)}" type="button"
+                          class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition">
+                          ${escapeHtml(ant)}
+                        </button>
+                      `).join('')}
+                    </div>
+                  ` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </article>
+        `;
+      } else {
+        bodyHtml = `
+          <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 text-center space-y-4">
+            <div class="w-14 h-14 rounded-2xl bg-[#1d2a57]/10 text-[#1d2a57] flex items-center justify-center mx-auto">
+              <i data-lucide="book-marked" class="w-7 h-7"></i>
+            </div>
+            <div>
+              <h2 class="text-lg font-extrabold text-slate-900">Tra từ điển chuẩn phong cách Cambridge</h2>
+              <p class="text-sm text-slate-500 mt-1 max-w-md mx-auto">Nhập bất kỳ từ tiếng Anh nào để xem phiên âm UK/US, nghe phát âm người thật, nghĩa chi tiết, câu ví dụ, từ đồng nghĩa và mở nhanh trang Cambridge gốc.</p>
+            </div>
+            <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+              <span class="text-xs font-bold text-slate-400">Gợi ý tra thử:</span>
+              ${['scholarship', 'hospitality', 'resilient', 'courtesy', 'engineering', 'curriculum'].map(w => `
+                <button data-action="dict-quick-lookup" data-word="${w}" type="button"
+                  class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-sky-50 hover:text-sky-800 text-slate-700 text-xs font-bold transition">
+                  ${w}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <section class="max-w-3xl mx-auto space-y-5">
+          <div>
+            <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900">Từ điển Anh - Anh / Anh - Việt</h1>
+            <p class="text-sm text-slate-500 mt-0.5">Tra cứu nhanh theo bố cục Cambridge Dictionary kèm phát âm chuẩn UK / US.</p>
+          </div>
+
+          <!-- Search Box -->
+          <form id="dict-search-form" class="flex items-center gap-2">
+            <div class="relative flex-1">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              <input id="dict-search-input" type="text" value="${escapeAttr(state.dictQuery)}"
+                placeholder="Nhập từ tiếng Anh cần tra (VD: scholarship, polite, resilient)..."
+                class="w-full pl-11 pr-4 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-600 shadow-2xs" />
+            </div>
+            <button type="submit"
+              class="px-5 py-3 rounded-2xl bg-[#1d2a57] hover:bg-[#152044] text-white text-sm font-bold flex items-center gap-1.5 shadow-xs transition shrink-0">
+              <i data-lucide="search" class="w-4 h-4"></i>
+              <span>Tra từ</span>
+            </button>
+          </form>
+
+          <!-- Recent History Chips -->
+          ${state.dictHistory.length ? `
+            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              <span class="text-[11px] font-bold text-slate-400 shrink-0 mr-1">Gần đây:</span>
+              ${state.dictHistory.map(w => `
+                <button data-action="dict-quick-lookup" data-word="${escapeAttr(w)}" type="button"
+                  class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-sky-400 hover:text-sky-800 text-xs font-semibold text-slate-600 whitespace-nowrap transition">
+                  ${escapeHtml(w)}
+                </button>
+              `).join('')}
+            </div>
+          ` : ''}
+
+          ${bodyHtml}
         </section>
       `;
     }
@@ -2538,6 +2857,8 @@
         main.innerHTML = renderLearn(true);
       } else if (state.view === 'flashcard') {
         main.innerHTML = renderFlashcard();
+      } else if (state.view === 'dictionary') {
+        main.innerHTML = renderDictionary();
       } else if (state.view === 'quiz') {
         main.innerHTML = state.quizActive ? renderQuizActive() : renderQuizSetup();
       }
@@ -2581,6 +2902,14 @@
           if (ni) { ni.focus(); ni.setSelectionRange(cursor, cursor); }
         });
       }
+      const dictForm = document.getElementById('dict-search-form');
+      if (dictForm) {
+        dictForm.addEventListener('submit', (ev) => {
+          ev.preventDefault();
+          const inp = document.getElementById('dict-search-input');
+          if (inp && inp.value.trim()) lookupCambridgeDictionary(inp.value.trim());
+        });
+      }
     }
 
     // Event Delegation
@@ -2608,6 +2937,21 @@
       const action = actEl.dataset.action;
 
       if (action === 'reload-db') { loadDataFromSupabase(true); return; }
+      if (action === 'dict-quick-lookup') {
+        lookupCambridgeDictionary(actEl.dataset.word);
+        return;
+      }
+      if (action === 'dict-play-audio') {
+        const u = actEl.dataset.url;
+        const w = actEl.dataset.word;
+        const acc = actEl.dataset.accent || 'US';
+        if (u) {
+          playMp3Url(u, state.speechRate).catch(() => speakText(w, acc, state.speechRate));
+        } else {
+          speakText(w, acc, state.speechRate);
+        }
+        return;
+      }
       if (action === 'speak-word') { e.stopPropagation(); speakText(actEl.dataset.text); return; }
       if (action === 'speak-vocab') {
         e.stopPropagation();
