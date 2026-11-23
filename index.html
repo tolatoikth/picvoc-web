@@ -179,9 +179,97 @@
     <div id="onboarding-modal-card" class="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 animate-pop border border-slate-200 space-y-4"></div>
   </div>
 
-  <!-- Floating 3D Chibi Mascot Widget (Bottom-Right, Compact & Extensible) -->
-  <div id="mascot-widget" class="fixed bottom-16 md:bottom-5 right-3 sm:right-5 z-40 flex flex-col items-end pointer-events-none select-none">
-    <!-- Modern Glass Speech Bubble -->
+  <!-- Floating 3D Chibi Mascot Widget + Resizable AI Chat Panel -->
+  <div id="mascot-widget" class="fixed bottom-16 md:bottom-5 right-3 sm:right-5 z-40 flex flex-col items-end pointer-events-none">
+    <!-- Resizable Rectangular AI Chat Box -->
+    <div id="mascot-chat-panel" style="width: 360px; height: 470px;"
+      class="hidden pointer-events-auto mb-2 relative bg-white/95 backdrop-blur-md border border-slate-200 shadow-2xl rounded-2xl flex flex-col overflow-hidden animate-bubble max-w-[94vw] max-h-[78vh]">
+      <!-- Top-Left Corner Resize Handle -->
+      <button id="mascot-resize-handle" type="button" title="Kéo góc này để chỉnh độ rộng &amp; chiều cao ô chat"
+        class="absolute top-0 left-0 z-20 w-6 h-6 cursor-nwse-resize flex items-start justify-start p-1 text-slate-400 hover:text-emerald-600 transition">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M3 11L11 3M3 6L6 3"/>
+        </svg>
+      </button>
+
+      <!-- Clean Chat Header -->
+      <div class="pl-7 pr-3 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-between gap-2 shrink-0">
+        <div class="min-w-0 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-300 shrink-0"></span>
+          <div class="min-w-0">
+            <div class="text-xs font-extrabold truncate">Trợ lý KaDoc AI</div>
+            <div id="chat-active-topic-label" class="text-[10px] text-emerald-100 truncate">Chạm gợi ý bên dưới để chọn chủ đề</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          <button id="btn-chat-api-key" type="button" title="Cài đặt Gemini API Key"
+            class="w-7 h-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+            <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
+          </button>
+          <button id="btn-chat-close" type="button" title="Thu gọn ô chat"
+            class="w-7 h-7 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center transition">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Top Suggestion Chips -->
+      <div id="chat-suggestions-bar" class="px-3 py-2 bg-slate-50 border-b border-slate-200/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+        <button data-action="chat-open-topic-picker" type="button"
+          class="px-2.5 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[11px] font-bold whitespace-nowrap flex items-center gap-1 transition">
+          <i data-lucide="sparkles" class="w-3 h-3"></i>
+          <span>Trò chuyện theo chủ đề</span>
+        </button>
+        <button data-action="chat-quick-prompt" data-prompt="Mình muốn diễn đạt một ý bằng tiếng Anh nhưng chưa biết nói sao cho tự nhiên, bạn hướng dẫn mình nhé." type="button"
+          class="px-2.5 py-1 rounded-full bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-semibold whitespace-nowrap transition">
+          Gợi ý cách diễn đạt
+        </button>
+      </div>
+
+      <!-- Inline Topic Picker Drawer (opens when user clicks "Trò chuyện theo chủ đề") -->
+      <div id="chat-topic-picker" class="hidden px-3 py-2.5 bg-emerald-50/70 border-b border-emerald-200 space-y-2 shrink-0">
+        <label class="block text-[11px] font-bold text-emerald-900">Chọn chủ đề để AI dùng từ vựng trò chuyện cùng bạn:</label>
+        <div class="flex items-center gap-2">
+          <select id="chat-topic-select" class="flex-1 px-2.5 py-1.5 rounded-xl border border-emerald-300 bg-white text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"></select>
+          <button data-action="chat-confirm-topic" type="button"
+            class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shrink-0 transition">
+            OK
+          </button>
+        </div>
+      </div>
+
+      <!-- Optional API Key Config Drawer -->
+      <div id="chat-key-drawer" class="hidden px-3 py-2.5 bg-amber-50 border-b border-amber-200 space-y-2 shrink-0">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[11px] font-bold text-amber-900">Nhập Gemini API Key miễn phí</span>
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" class="text-[10px] font-bold text-emerald-700 underline">Lấy key miễn phí</a>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <input id="chat-key-input" type="password" placeholder="AIza..."
+            class="flex-1 px-2.5 py-1.5 rounded-xl border border-amber-300 bg-white text-xs focus:outline-none focus:border-emerald-500" />
+          <button data-action="chat-save-key" type="button"
+            class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shrink-0">
+            Lưu
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages Stream -->
+      <div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 bg-white"></div>
+
+      <!-- Input Form -->
+      <form id="chat-form" class="p-2.5 border-t border-slate-200 bg-slate-50 flex items-center gap-2 shrink-0">
+        <input id="chat-input" type="text" autocomplete="off"
+          placeholder="Nhập tiếng Anh hoặc hỏi cách nói..."
+          class="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs sm:text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
+        <button id="chat-send-btn" type="submit"
+          class="w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center shrink-0 transition">
+          <i data-lucide="send" class="w-4 h-4"></i>
+        </button>
+      </form>
+    </div>
+
+    <!-- Modern Glass Speech Bubble (Greeting / Future Notifications) -->
     <div id="mascot-bubble" class="hidden pointer-events-auto mb-1.5 mr-1 max-w-[235px] sm:max-w-[265px] bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-lg rounded-2xl rounded-br-sm px-3.5 py-2.5 animate-bubble">
       <div class="flex items-start justify-between gap-2">
         <div id="mascot-bubble-content" class="text-xs sm:text-[13px] text-slate-700 leading-snug"></div>
@@ -192,8 +280,9 @@
       </div>
       <div id="mascot-bubble-actions" class="hidden mt-2 pt-2 border-t border-slate-100 flex items-center gap-2"></div>
     </div>
+
     <!-- 3D Chibi Canvas Container -->
-    <button id="btn-mascot-avatar" type="button" title="Chạm vào linh vật để trò chuyện"
+    <button id="btn-mascot-avatar" type="button" title="Chạm vào linh vật để mở KaDoc AI"
       class="pointer-events-auto relative w-[92px] h-[92px] sm:w-[104px] sm:h-[104px] rounded-full focus:outline-none group transition-transform hover:scale-105 active:scale-95">
       <div class="absolute inset-2 rounded-full bg-gradient-to-tr from-emerald-100/80 via-white/90 to-teal-50/80 border border-white shadow-md group-hover:shadow-lg transition"></div>
       <canvas id="mascot-canvas" class="relative z-10 w-full h-full block"></canvas>
@@ -3909,7 +3998,20 @@
         return;
       }
       if (e.target.closest('#btn-mascot-avatar')) {
-        triggerMascotGreeting();
+        if (chatState.open) closeMascotChat();
+        else openMascotChat();
+        return;
+      }
+      if (e.target.closest('#btn-chat-close')) {
+        closeMascotChat();
+        return;
+      }
+      if (e.target.closest('#btn-chat-api-key')) {
+        chatState.keyDrawerOpen = !chatState.keyDrawerOpen;
+        const kd = document.getElementById('chat-key-drawer');
+        if (kd) kd.classList.toggle('hidden', !chatState.keyDrawerOpen);
+        const ki = document.getElementById('chat-key-input');
+        if (ki) ki.value = chatState.apiKey || '';
         return;
       }
       const actEl = e.target.closest('[data-action]');
@@ -3942,6 +4044,33 @@
         setTimeout(() => triggerMascotGreeting(), 250);
         return;
       }
+      if (action === 'chat-open-topic-picker') {
+        chatState.topicPickerOpen = !chatState.topicPickerOpen;
+        const tp = document.getElementById('chat-topic-picker');
+        if (tp) tp.classList.toggle('hidden', !chatState.topicPickerOpen);
+        populateChatTopicSelect();
+        return;
+      }
+      if (action === 'chat-confirm-topic') {
+        const sel = document.getElementById('chat-topic-select');
+        const tid = sel ? sel.value : (TOPICS[0] ? TOPICS[0].id : 'education');
+        await startTopicConversation(tid);
+        return;
+      }
+      if (action === 'chat-save-key') {
+        const ki = document.getElementById('chat-key-input');
+        chatState.apiKey = ki ? ki.value.trim() : '';
+        try { localStorage.setItem(GEMINI_KEY_STORAGE, chatState.apiKey); } catch (e) {}
+        chatState.keyDrawerOpen = false;
+        const kd = document.getElementById('chat-key-drawer');
+        if (kd) kd.classList.add('hidden');
+        showToast(chatState.apiKey ? 'Đã lưu Gemini API Key!' : 'Đã xóa API Key');
+        return;
+      }
+      if (action === 'chat-quick-prompt') {
+        sendChatMessage(actEl.dataset.prompt);
+        return;
+      }
       if (action === 'ob-save') {
         state.profile = {
           nickname: (state.obDraftNickname || '').trim(),
@@ -3956,6 +4085,316 @@
       }
     });
 
+
+    // =========================================================
+    // 6. KADOC AI CONVERSATION ASSISTANT (TOPIC-AWARE + COACHING)
+    // =========================================================
+    const GEMINI_KEY_STORAGE = 'kadoc_gemini_api_key_v1';
+    const chatState = {
+      open: false,
+      topicId: '',
+      topicPickerOpen: false,
+      keyDrawerOpen: false,
+      busy: false,
+      messages: [],
+      apiKey: (function() { try { return localStorage.getItem(GEMINI_KEY_STORAGE) || ''; } catch (e) { return ''; } })()
+    };
+
+    function getChatIntroMessage() {
+      const nick = escapeHtml(getDisplayNickname());
+      return `Chào <strong>${nick}</strong>! Mình là trợ lý <strong>KaDoc AI</strong>. Hãy bấm gợi ý <strong>"Trò chuyện theo chủ đề"</strong> ở trên để chọn chủ đề, hoặc nhắn bất kỳ câu tiếng Anh nào để mình trò chuyện và gợi ý cách nói tự nhiên hơn nhé.`;
+    }
+
+    function openMascotChat() {
+      chatState.open = true;
+      window.PicVocMascot.hide();
+      const panel = document.getElementById('mascot-chat-panel');
+      if (panel) {
+        panel.classList.remove('hidden');
+        panel.classList.add('flex');
+      }
+      if (!chatState.messages.length) {
+        chatState.messages.push({ role: 'ai', html: getChatIntroMessage(), plain: '' });
+      }
+      renderChatMessages();
+      populateChatTopicSelect();
+      if (window.lucide) lucide.createIcons();
+      const inp = document.getElementById('chat-input');
+      if (inp) setTimeout(() => inp.focus(), 80);
+    }
+
+    function closeMascotChat() {
+      chatState.open = false;
+      const panel = document.getElementById('mascot-chat-panel');
+      if (panel) {
+        panel.classList.add('hidden');
+        panel.classList.remove('flex');
+      }
+    }
+
+    function populateChatTopicSelect() {
+      const sel = document.getElementById('chat-topic-select');
+      if (!sel) return;
+      const cur = chatState.topicId || (TOPICS[0] ? TOPICS[0].id : 'education');
+      sel.innerHTML = TOPICS.map(t => {
+        const cnt = getWordsByTopic(t.id).length;
+        return `<option value="${escapeAttr(t.id)}" ${t.id === cur ? 'selected' : ''}>#${t.sortOrder || ''} ${escapeHtml(t.name)} — ${escapeHtml(t.viName)}${cnt ? ` (${cnt} từ)` : ''}</option>`;
+      }).join('');
+    }
+
+    function formatAiTextToHtml(text) {
+      let safe = escapeHtml(text || '');
+      safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      safe = safe.replace(/
+/g, '<br/>');
+      return safe;
+    }
+
+    function renderChatMessages() {
+      const box = document.getElementById('chat-messages');
+      if (!box) return;
+      const topicLabel = document.getElementById('chat-active-topic-label');
+      if (topicLabel) {
+        if (chatState.topicId) {
+          const t = getTopicObj(chatState.topicId);
+          topicLabel.textContent = `Chủ đề: ${t.name} (${t.viName})`;
+        } else {
+          topicLabel.textContent = 'Chạm gợi ý bên dưới để chọn chủ đề';
+        }
+      }
+
+      box.innerHTML = chatState.messages.map(m => {
+        if (m.role === 'user') {
+          return `
+            <div class="flex justify-end">
+              <div class="max-w-[85%] rounded-2xl rounded-br-sm bg-emerald-600 text-white px-3.5 py-2 text-xs sm:text-[13px] leading-relaxed shadow-2xs">
+                ${escapeHtml(m.plain)}
+              </div>
+            </div>
+          `;
+        }
+        return `
+          <div class="flex justify-start">
+            <div class="max-w-[88%] rounded-2xl rounded-bl-sm bg-slate-100 text-slate-800 px-3.5 py-2.5 text-xs sm:text-[13px] leading-relaxed border border-slate-200/70 space-y-1.5">
+              <div>${m.html || formatAiTextToHtml(m.plain)}</div>
+              ${m.speakText ? `
+                <button data-action="speak-word" data-text="${escapeAttr(m.speakText)}" type="button"
+                  class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800">
+                  <i data-lucide="volume-2" class="w-3.5 h-3.5"></i> Nghe câu tiếng Anh
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('') + (chatState.busy ? `
+        <div class="flex justify-start">
+          <div class="rounded-2xl rounded-bl-sm bg-slate-100 px-3.5 py-2.5 text-xs text-slate-500 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style="animation-delay:0.12s"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" style="animation-delay:0.24s"></span>
+          </div>
+        </div>
+      ` : '');
+
+      box.scrollTop = box.scrollHeight;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function buildTopicSystemPrompt() {
+      const nick = getDisplayNickname();
+      const t = chatState.topicId ? getTopicObj(chatState.topicId) : null;
+      const topicWords = t ? getWordsByTopic(t.id).slice(0, 35) : [];
+      const vocabListStr = topicWords.length
+        ? topicWords.map(w => `${w.word} (${w.vi})`).join(', ')
+        : (t ? `các từ vựng phổ biến liên quan đến ${t.name} (${t.viName})` : 'từ vựng giao tiếp tiếng Anh thông dụng');
+
+      return [
+        `Bạn là trợ lý học tiếng Anh thân thiện, hiện đại tên KaDoc AI đang trò chuyện với người học tên "${nick}".`,
+        t ? `Chủ đề đang chọn: "${t.name}" (${t.viName}) — ${t.description}.` : 'Người học chưa khóa chủ đề cụ thể, hãy trò chuyện linh hoạt.',
+        `Kho từ vựng ưu tiên của chủ đề: ${vocabListStr}.`,
+        'Nhiệm vụ quan trọng:',
+        '1. Trò chuyện tự nhiên bằng tiếng Anh (ngắn gọn 2-4 câu mỗi lượt) và chủ động lồng ghép 1-2 từ vựng của chủ đề vào câu nói (in đậm **từ đó**).',
+        '2. Nếu người dùng diễn đạt gượng, sai ngữ pháp, dùng từ chưa chuẩn hoặc đang cố nói một ý liên quan chủ đề (ví dụ: viết "I like solve problem" khi muốn nói thích giải toán), hãy nhẹ nhàng hướng dẫn cách nói tự nhiên hơn bằng tiếng Việt ngắn gọn kèm câu tiếng Anh chuẩn (ví dụ: "💡 Gợi ý nói tự nhiên: **I like solving math problems**"), rồi hỏi tiếp 1 câu ngắn để duy trì hội thoại.',
+        '3. Không dài dòng, không dùng ngôn ngữ máy móc.'
+      ].join('
+');
+    }
+
+    async function callGeminiAI(userText) {
+      const key = (chatState.apiKey || '').trim();
+      const historyContents = chatState.messages
+        .filter(m => m.plain)
+        .slice(-10)
+        .map(m => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.plain }]
+        }));
+
+      const payload = {
+        systemInstruction: { parts: [{ text: buildTopicSystemPrompt() }] },
+        contents: historyContents,
+        generationConfig: { temperature: 0.7, maxOutputTokens: 320 }
+      };
+
+      const models = ['gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+      for (const model of models) {
+        try {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) continue;
+          const data = await res.json();
+          const txt = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts
+            ? data.candidates[0].content.parts.map(p => p.text || '').join('').trim()
+            : '';
+          if (txt) return txt;
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    function buildSmartDemoReply(userText) {
+      const lower = (userText || '').toLowerCase();
+      const t = chatState.topicId ? getTopicObj(chatState.topicId) : null;
+      const words = t ? getWordsByTopic(t.id) : [];
+
+      if (lower.includes('solve problem') || lower.includes('toán') || lower.includes('math')) {
+        return `💡 **Gợi ý nói tự nhiên:** Thay vì *"I like solve problem"*, bạn có thể nói:
+• **I like solving math problems.** (Tôi thích giải bài toán)
+• **I enjoy working on math assignments.** (Tôi thích làm bài tập toán)
+
+Now let's keep going! Which **lecture** or subject do you enjoy the most at school?`;
+      }
+      if (!chatState.apiKey) {
+        const sampleWord = words[0] ? `**${words[0].word}** (${words[0].vi})` : '**vocabulary**';
+        return `Mình đang ở chế độ mẫu (chưa gắn Gemini API Key). Với chủ đề ${t ? `**${t.name}**` : 'này'}, bạn có thể thử dùng từ ${sampleWord} để đặt 1 câu.
+
+🔑 Bấm biểu tượng **chìa khóa** ở góc trên ô chat để dán **Gemini API Key miễn phí** (lấy tại aistudio.google.com/apikey) là mình sẽ trò chuyện AI thật và sửa từng câu cho bạn nhé!`;
+      }
+      return 'Mình chưa kết nối được tới máy chủ AI lúc này, bạn kiểm tra lại API Key ở biểu tượng chìa khóa trên thanh tiêu đề nhé.';
+    }
+
+    function extractEnglishSentence(text) {
+      const lines = String(text || '').replace(/\*\*/g, '').split('
+');
+      const enLine = lines.find(l => /[a-zA-Z]{4,}/.test(l) && !/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(l));
+      return enLine ? enLine.trim() : '';
+    }
+
+    async function sendChatMessage(text) {
+      const clean = String(text || '').trim();
+      if (!clean || chatState.busy) return;
+      chatState.messages.push({ role: 'user', plain: clean });
+      chatState.busy = true;
+      renderChatMessages();
+
+      let replyText = null;
+      if (chatState.apiKey) {
+        replyText = await callGeminiAI(clean);
+      }
+      if (!replyText) {
+        replyText = buildSmartDemoReply(clean);
+      }
+
+      chatState.busy = false;
+      chatState.messages.push({
+        role: 'ai',
+        plain: replyText,
+        html: formatAiTextToHtml(replyText),
+        speakText: extractEnglishSentence(replyText)
+      });
+      renderChatMessages();
+    }
+
+    async function startTopicConversation(topicId) {
+      chatState.topicId = topicId;
+      chatState.topicPickerOpen = false;
+      const picker = document.getElementById('chat-topic-picker');
+      if (picker) picker.classList.add('hidden');
+
+      const t = getTopicObj(topicId);
+      const words = getWordsByTopic(topicId).slice(0, 6);
+      const nick = escapeHtml(getDisplayNickname());
+
+      if (chatState.apiKey) {
+        chatState.busy = true;
+        renderChatMessages();
+        const kickoff = `Hãy chào "${getDisplayNickname()}" thật ngắn gọn và mở đầu cuộc trò chuyện tiếng Anh về chủ đề "${t.name}" (${t.viName}), dùng sẵn 1-2 từ trong chủ đề để người học trả lời.`;
+        chatState.messages.push({ role: 'user', plain: `[Bắt đầu chủ đề ${t.name}]` });
+        const aiStart = await callGeminiAI(kickoff);
+        chatState.busy = false;
+        if (aiStart) {
+          chatState.messages.push({ role: 'ai', plain: aiStart, html: formatAiTextToHtml(aiStart), speakText: extractEnglishSentence(aiStart) });
+          renderChatMessages();
+          return;
+        }
+      }
+
+      const wordHints = words.length
+        ? words.map(w => `<strong>${escapeHtml(w.word)}</strong>`).join(', ')
+        : `các từ về ${escapeHtml(t.viName)}`;
+      const openingEn = topicId === 'education'
+        ? `Hi ${getDisplayNickname()}! Let's talk about Education. Do you prefer studying in the **library** or attending a **lecture**?`
+        : topicId === 'polite'
+          ? `Hi ${getDisplayNickname()}! Let's practice Polite expressions. How do you usually **apologize** politely when you're late?`
+          : `Hi ${getDisplayNickname()}! Let's talk about **${t.name}**. What do you enjoy most about ${t.name.toLowerCase()}?`;
+
+      chatState.messages.push({
+        role: 'ai',
+        plain: openingEn,
+        html: `Đã chọn chủ đề <strong>${escapeHtml(t.name)}</strong> (${wordHints}).<br/><br/>${formatAiTextToHtml(openingEn)}`,
+        speakText: openingEn.replace(/\*\*/g, '')
+      });
+      renderChatMessages();
+    }
+
+    // Bind Corner Drag-to-Resize on Top-Left Handle
+    function initChatResizeHandle() {
+      const handle = document.getElementById('mascot-resize-handle');
+      const panel = document.getElementById('mascot-chat-panel');
+      if (!handle || !panel) return;
+      let resizing = false, startX = 0, startY = 0, startW = 360, startH = 470;
+
+      function onMove(ev) {
+        if (!resizing) return;
+        const pt = ev.touches ? ev.touches[0] : ev;
+        const dx = startX - pt.clientX;
+        const dy = startY - pt.clientY;
+        const maxW = Math.min(680, window.innerWidth - 24);
+        const maxH = Math.min(680, Math.round(window.innerHeight * 0.78));
+        const nextW = Math.max(290, Math.min(maxW, startW + dx));
+        const nextH = Math.max(330, Math.min(maxH, startH + dy));
+        panel.style.width = nextW + 'px';
+        panel.style.height = nextH + 'px';
+      }
+      function onEnd() {
+        resizing = false;
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onEnd);
+        window.removeEventListener('touchmove', onMove);
+        window.removeEventListener('touchend', onEnd);
+      }
+      function onStart(ev) {
+        ev.preventDefault();
+        const pt = ev.touches ? ev.touches[0] : ev;
+        resizing = true;
+        startX = pt.clientX;
+        startY = pt.clientY;
+        const rect = panel.getBoundingClientRect();
+        startW = rect.width;
+        startH = rect.height;
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onEnd);
+        window.addEventListener('touchmove', onMove, { passive: false });
+        window.addEventListener('touchend', onEnd);
+      }
+      handle.addEventListener('mousedown', onStart);
+      handle.addEventListener('touchstart', onStart, { passive: false });
+    }
+
+
     // Ensure browser voices load on Chrome/Cốc Cốc
     if ('speechSynthesis' in window) {
       window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
@@ -3963,6 +4402,19 @@
 
     window.addEventListener('DOMContentLoaded', async () => {
       initFloatingMascot();
+      initChatResizeHandle();
+      const chatForm = document.getElementById('chat-form');
+      if (chatForm) {
+        chatForm.addEventListener('submit', (ev) => {
+          ev.preventDefault();
+          const inp = document.getElementById('chat-input');
+          if (!inp) return;
+          const val = inp.value.trim();
+          if (!val) return;
+          inp.value = '';
+          sendChatMessage(val);
+        });
+      }
       await loadDataFromSupabase(false);
       await initAuth();
     });
