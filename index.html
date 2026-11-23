@@ -113,7 +113,7 @@
           <i data-lucide="volume-2" class="w-3.5 h-3.5 text-emerald-600"></i>
           <span id="accent-label">US</span>
         </button>
-        <button id="btn-voice-settings" type="button" title="Cài đặt giọng đọc & tốc độ"
+        <button id="btn-voice-settings" type="button" title="Cài đặt chung (Linh vật 3D, Biệt danh & Giọng đọc)"
           class="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 flex items-center justify-center transition">
           <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
         </button>
@@ -164,9 +164,9 @@
     <div id="word-modal-card" class="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto animate-pop border border-slate-200"></div>
   </div>
 
-  <!-- Voice Settings Modal -->
+  <!-- General Settings Modal (Mascot, Nickname & Voice) -->
   <div id="voice-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/55 backdrop-blur-xs p-3 sm:p-5">
-    <div id="voice-modal-card" class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-5 animate-pop border border-slate-200 space-y-4"></div>
+    <div id="voice-modal-card" class="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 animate-pop border border-slate-200 space-y-4"></div>
   </div>
 
   <!-- Auth Modal -->
@@ -313,9 +313,9 @@
       <div id="mascot-bubble-actions" class="hidden mt-2 pt-2 border-t border-slate-100 flex items-center gap-2"></div>
     </div>
 
-    <!-- 3D Chibi Canvas Container -->
-    <button id="btn-mascot-avatar" type="button" title="Chạm vào linh vật để mở KaDoc AI"
-      class="pointer-events-auto relative w-[92px] h-[92px] sm:w-[104px] sm:h-[104px] rounded-full focus:outline-none group transition-transform hover:scale-105 active:scale-95">
+    <!-- 3D Chibi Canvas Container (Click to open KaDoc AI, Hold & Drag to move anywhere) -->
+    <button id="btn-mascot-avatar" type="button" title="Chạm để mở KaDoc AI • Nhấn giữ và kéo để di chuyển khắp màn hình"
+      class="pointer-events-auto relative w-[92px] h-[92px] sm:w-[104px] sm:h-[104px] rounded-full focus:outline-none group transition-transform hover:scale-105 active:scale-95 cursor-grab active:cursor-grabbing select-none touch-none">
       <div class="absolute inset-2 rounded-full bg-gradient-to-tr from-emerald-100/80 via-white/90 to-teal-50/80 border border-white shadow-md group-hover:shadow-lg transition"></div>
       <canvas id="mascot-canvas" class="relative z-10 w-full h-full block"></canvas>
     </button>
@@ -473,6 +473,8 @@
           preferredUSVoice: state.preferredUSVoice,
           preferredUKVoice: state.preferredUKVoice,
           useRealDictAudio: state.useRealDictAudio,
+          showMascot: state.showMascot,
+          mascotPos: state.mascotPos,
           profile: state.profile,
           topicStates: state.topicStates,
           dictHistory: state.dictHistory
@@ -497,6 +499,8 @@
       accent: saved.accent === 'UK' ? 'UK' : 'US',
       speechRate: saved.speechRate === 0.75 ? 0.75 : 1.0,
       useRealDictAudio: saved.useRealDictAudio !== false,
+      showMascot: saved.showMascot !== false,
+      mascotPos: (saved.mascotPos && typeof saved.mascotPos.left === 'number' && typeof saved.mascotPos.top === 'number') ? saved.mascotPos : null,
       preferredUSVoice: saved.preferredUSVoice || '',
       preferredUKVoice: saved.preferredUKVoice || '',
       bestQuizScore: typeof saved.bestQuizScore === 'number' ? saved.bestQuizScore : 0,
@@ -2689,50 +2693,92 @@
       const usVoices = voices.filter(v => v.lang.toLowerCase().startsWith('en-us'));
       const ukVoices = voices.filter(v => v.lang.toLowerCase().startsWith('en-gb'));
 
+      const mascotMeta = getMascotMeta(state.profile.mascot);
+      const nickLabel = (state.profile && state.profile.nickname) ? state.profile.nickname : 'bạn (mặc định)';
+
       card.innerHTML = `
         <div class="flex items-center justify-between">
-          <h3 class="text-lg font-extrabold text-slate-900">Cài đặt giọng đọc</h3>
+          <div>
+            <h3 class="text-lg font-extrabold text-slate-900">Cài đặt chung</h3>
+            <p class="text-xs text-slate-500">Quản lý linh vật 3D, biệt danh và giọng phát âm</p>
+          </div>
           <button data-action="close-voice-modal" type="button" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
 
-        <label class="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 cursor-pointer">
-          <input id="chk-real-audio" type="checkbox" ${state.useRealDictAudio ? 'checked' : ''} class="mt-1 accent-emerald-600 w-4 h-4" />
-          <div>
-            <div class="text-sm font-bold text-emerald-900">Ưu tiên giọng đọc người thật (Dictionary MP3)</div>
-            <div class="text-xs text-emerald-700 mt-0.5">Tự động phát file ghi âm chuẩn cho từ đơn Anh - Mỹ &amp; Anh - Anh thay vì giọng robot mặc định.</div>
+        <!-- Section 1: 3D Mascot & Profile -->
+        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+          <div class="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Linh vật 3D &amp; Biệt danh</span>
           </div>
-        </label>
 
-        <div class="space-y-2">
-          <label class="block text-xs font-bold text-slate-500 uppercase">Tốc độ đọc</label>
-          <div class="grid grid-cols-2 gap-2">
-            <button data-action="set-speed" data-rate="1" type="button"
-              class="py-2 rounded-xl text-xs font-bold border ${state.speechRate === 1.0 ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200'}">
-              1.0x (Bình thường)
+          <label class="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer">
+            <div>
+              <div class="text-xs font-bold text-slate-800">Hiện linh vật 3D trợ lý ảo</div>
+              <div class="text-[11px] text-slate-500">Bật để hiện linh vật (nhấn giữ và kéo đi khắp màn hình), tắt để ẩn hoàn toàn.</div>
+            </div>
+            <input id="chk-show-mascot" type="checkbox" ${state.showMascot ? 'checked' : ''} class="accent-emerald-600 w-4 h-4 shrink-0" />
+          </label>
+
+          <div class="flex items-center gap-2">
+            <button data-action="open-onboarding-from-settings" type="button"
+              class="flex-1 py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 border border-emerald-200 transition">
+              <i data-lucide="user-pen" class="w-3.5 h-3.5"></i>
+              <span>Đổi biệt danh &amp; linh vật (${escapeHtml(mascotMeta.name)} · ${escapeHtml(nickLabel)})</span>
             </button>
-            <button data-action="set-speed" data-rate="0.75" type="button"
-              class="py-2 rounded-xl text-xs font-bold border ${state.speechRate === 0.75 ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200'}">
-              0.75x (Chậm dễ nghe)
+            <button data-action="reset-mascot-pos" type="button" title="Đưa linh vật về góc dưới bên phải"
+              class="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-600 font-bold text-xs border border-slate-200 shrink-0 transition">
+              Về góc cũ
             </button>
           </div>
         </div>
 
-        <div class="space-y-2">
-          <label class="block text-xs font-bold text-slate-500 uppercase">Giọng dự phòng Anh - Mỹ (cho câu ví dụ)</label>
-          <select id="sel-us-voice" class="w-full p-2.5 rounded-xl border border-slate-200 text-xs bg-white">
-            <option value="">Tự động chọn giọng êm nhất (Natural/Google)</option>
-            ${usVoices.map(v => `<option value="${escapeAttr(v.name)}" ${state.preferredUSVoice === v.name ? 'selected' : ''}>${escapeHtml(v.name)}</option>`).join('')}
-          </select>
-        </div>
+        <!-- Section 2: Pronunciation & Voice -->
+        <div class="space-y-3 pt-1">
+          <div class="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="volume-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Giọng đọc &amp; Tốc độ</span>
+          </div>
 
-        <div class="space-y-2">
-          <label class="block text-xs font-bold text-slate-500 uppercase">Giọng dự phòng Anh - Anh</label>
-          <select id="sel-uk-voice" class="w-full p-2.5 rounded-xl border border-slate-200 text-xs bg-white">
-            <option value="">Tự động chọn giọng êm nhất</option>
-            ${ukVoices.map(v => `<option value="${escapeAttr(v.name)}" ${state.preferredUKVoice === v.name ? 'selected' : ''}>${escapeHtml(v.name)}</option>`).join('')}
-          </select>
+          <label class="flex items-start gap-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 cursor-pointer">
+            <input id="chk-real-audio" type="checkbox" ${state.useRealDictAudio ? 'checked' : ''} class="mt-1 accent-emerald-600 w-4 h-4" />
+            <div>
+              <div class="text-sm font-bold text-emerald-900">Ưu tiên giọng đọc người thật (Dictionary MP3)</div>
+              <div class="text-xs text-emerald-700 mt-0.5">Tự động phát file ghi âm chuẩn cho từ đơn Anh - Mỹ &amp; Anh - Anh thay vì giọng robot mặc định.</div>
+            </div>
+          </label>
+
+          <div class="space-y-2">
+            <label class="block text-xs font-bold text-slate-500 uppercase">Tốc độ đọc</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button data-action="set-speed" data-rate="1" type="button"
+                class="py-2 rounded-xl text-xs font-bold border ${state.speechRate === 1.0 ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200'}">
+                1.0x (Bình thường)
+              </button>
+              <button data-action="set-speed" data-rate="0.75" type="button"
+                class="py-2 rounded-xl text-xs font-bold border ${state.speechRate === 0.75 ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200'}">
+                0.75x (Chậm dễ nghe)
+              </button>
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <label class="block text-xs font-bold text-slate-500 uppercase">Giọng dự phòng Anh - Mỹ (cho câu ví dụ)</label>
+            <select id="sel-us-voice" class="w-full p-2.5 rounded-xl border border-slate-200 text-xs bg-white">
+              <option value="">Tự động chọn giọng êm nhất (Natural/Google)</option>
+              ${usVoices.map(v => `<option value="${escapeAttr(v.name)}" ${state.preferredUSVoice === v.name ? 'selected' : ''}>${escapeHtml(v.name)}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="space-y-2">
+            <label class="block text-xs font-bold text-slate-500 uppercase">Giọng dự phòng Anh - Anh</label>
+            <select id="sel-uk-voice" class="w-full p-2.5 rounded-xl border border-slate-200 text-xs bg-white">
+              <option value="">Tự động chọn giọng êm nhất</option>
+              ${ukVoices.map(v => `<option value="${escapeAttr(v.name)}" ${state.preferredUKVoice === v.name ? 'selected' : ''}>${escapeHtml(v.name)}</option>`).join('')}
+            </select>
+          </div>
         </div>
 
         <div class="flex items-center justify-between gap-2 pt-2">
@@ -2751,6 +2797,15 @@
       modal.classList.add('flex');
       if (window.lucide) lucide.createIcons();
 
+      const chkMascot = document.getElementById('chk-show-mascot');
+      if (chkMascot) {
+        chkMascot.addEventListener('change', (e) => {
+          state.showMascot = e.target.checked;
+          saveState();
+          applyMascotVisibilityAndPosition();
+          showToast(state.showMascot ? 'Đã bật linh vật 3D' : 'Đã tắt linh vật 3D');
+        });
+      }
       document.getElementById('chk-real-audio').addEventListener('change', (e) => {
         state.useRealDictAudio = e.target.checked;
         saveState();
@@ -2830,12 +2885,6 @@
               <div class="text-xs font-medium text-amber-800">Từ yêu thích</div>
             </div>
           </div>
-
-          <button data-action="open-onboarding" type="button"
-            class="w-full py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center gap-2 border border-emerald-200 transition">
-            <i data-lucide="sparkles" class="w-4 h-4"></i>
-            <span>Đổi biệt danh &amp; linh vật 3D (${escapeHtml(getMascotMeta(state.profile.mascot).name)})</span>
-          </button>
 
           <button data-action="do-logout" type="button"
             class="w-full py-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-sm flex items-center justify-center gap-2 transition">
@@ -4030,6 +4079,10 @@
         return;
       }
       if (e.target.closest('#btn-mascot-avatar')) {
+        if (window.__kadocMascotJustDragged) {
+          window.__kadocMascotJustDragged = false;
+          return;
+        }
         if (chatState.open) closeMascotChat();
         else openMascotChat();
         return;
@@ -4049,9 +4102,17 @@
       const actEl = e.target.closest('[data-action]');
       if (!actEl) return;
       const action = actEl.dataset.action;
-      if (action === 'open-onboarding') {
+      if (action === 'open-onboarding' || action === 'open-onboarding-from-settings') {
         closeAuthModal();
+        closeVoiceModal();
         openOnboardingModal();
+        return;
+      }
+      if (action === 'reset-mascot-pos') {
+        state.mascotPos = null;
+        saveState();
+        applyMascotVisibilityAndPosition();
+        showToast('Đã đưa linh vật về góc dưới bên phải');
         return;
       }
       if (action === 'ob-pick-mascot') {
@@ -4174,9 +4235,15 @@
       chatState.open = true;
       window.PicVocMascot.hide();
       const panel = document.getElementById('mascot-chat-panel');
+      const widget = document.getElementById('mascot-widget');
       if (panel) {
         panel.classList.remove('hidden');
         panel.classList.add('flex');
+      }
+      if (widget && state.mascotPos) {
+        const openBelow = state.mascotPos.top < Math.min(420, window.innerHeight * 0.45);
+        widget.classList.toggle('flex-col-reverse', openBelow);
+        widget.classList.toggle('flex-col', !openBelow);
       }
       if (!chatState.messages.length) {
         chatState.messages.push({ role: 'ai', html: getChatIntroMessage(), plain: '' });
@@ -4195,6 +4262,11 @@
       if (panel) {
         panel.classList.add('hidden');
         panel.classList.remove('flex');
+      }
+      const widget = document.getElementById('mascot-widget');
+      if (widget) {
+        widget.classList.remove('flex-col-reverse');
+        widget.classList.add('flex-col');
       }
     }
 
@@ -4268,19 +4340,23 @@
     function buildTopicSystemPrompt() {
       const nick = getDisplayNickname();
       const t = chatState.topicId ? getTopicObj(chatState.topicId) : null;
-      const topicWords = t ? getWordsByTopic(t.id).slice(0, 35) : [];
+      const topicWords = t ? getWordsByTopic(t.id).slice(0, 25) : [];
       const vocabListStr = topicWords.length
         ? topicWords.map(w => `${w.word} (${w.vi})`).join(', ')
-        : (t ? `các từ vựng phổ biến liên quan đến ${t.name} (${t.viName})` : 'từ vựng giao tiếp tiếng Anh thông dụng');
+        : (t ? `các từ vựng cơ bản của chủ đề ${t.name} (${t.viName})` : 'từ vựng giao tiếp tiếng Anh hằng ngày');
+      const nowStr = new Date().toLocaleString('vi-VN', {
+        weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
 
       return [
-        `Bạn là trợ lý học tiếng Anh thân thiện, hiện đại tên KaDoc AI đang trò chuyện với người học tên "${nick}".`,
-        t ? `Chủ đề đang chọn: "${t.name}" (${t.viName}) — ${t.description}.` : 'Người học chưa khóa chủ đề cụ thể, hãy trò chuyện linh hoạt.',
-        `Kho từ vựng ưu tiên của chủ đề: ${vocabListStr}.`,
-        'Nhiệm vụ quan trọng:',
-        '1. Trò chuyện tự nhiên bằng tiếng Anh (ngắn gọn 2-4 câu mỗi lượt) và chủ động lồng ghép 1-2 từ vựng của chủ đề vào câu nói (in đậm **từ đó**).',
-        '2. Nếu người dùng diễn đạt gượng, sai ngữ pháp, dùng từ chưa chuẩn hoặc đang cố nói một ý liên quan chủ đề (ví dụ: viết "I like solve problem" khi muốn nói thích giải toán), hãy nhẹ nhàng hướng dẫn cách nói tự nhiên hơn bằng tiếng Việt ngắn gọn kèm câu tiếng Anh chuẩn (ví dụ: "💡 Gợi ý nói tự nhiên: **I like solving math problems**"), rồi hỏi tiếp 1 câu ngắn để duy trì hội thoại.',
-        '3. Không dài dòng, không dùng ngôn ngữ máy móc.'
+        `Bạn là trợ lý luyện tiếng Anh siêu đơn giản tên KaDoc AI, đang nói chuyện với "${nick}".`,
+        `Thời gian hiện tại trên máy người dùng: ${nowStr}.`,
+        t ? `Chủ đề đang chọn: "${t.name}" (${t.viName}).` : 'Chưa chọn chủ đề cố định.',
+        `Từ vựng ưu tiên của chủ đề: ${vocabListStr}.`,
+        'PHẠM VI BẮT BUỘC (TUYỆT ĐỐI TUÂN THỦ):',
+        '1. CHỈ được làm 3 việc: (a) Trò chuyện tiếng Anh thật ngắn gọn (1-3 câu) có lồng 1-2 từ vựng chủ đề (in đậm **từ đó**), (b) Sửa lỗi ngữ pháp & gợi ý cách diễn đạt tiếng Anh tự nhiên hơn (ví dụ "I like solve problem" -> gợi ý "**I like solving math problems**"), (c) Tán gẫu đời thường đơn giản như một người bạn bình thường (ví dụ hỏi ăn cơm có no không, hoặc hỏi hôm nay ngày mấy / mấy giờ thì trả lời theo thời gian ở trên).',
+        '2. TUYỆT ĐỐI KHÔNG tra cứu, KHÔNG trả lời các câu hỏi về tin tức, kinh tế, tài chính, chính trị, chứng khoán, lập trình, giải toán/lý/hóa hay kiến thức chuyên sâu ngoài tiếng Anh. Nếu người dùng hỏi những việc đó, hãy từ chối thật ngắn gọn và lịch sự: "Mình chỉ là trợ lý nhỏ giúp bạn luyện tiếng Anh và sửa câu thôi, mình không tra cứu được tin tức hay kiến thức chuyên sâu đâu. Quay lại luyện nói tiếng Anh nhé!"',
+        '3. Luôn trả lời ngắn gọn, súc tích, không dài dòng để tiết kiệm chữ.'
       ].join('\n');
     }
 
@@ -4288,7 +4364,7 @@
       const key = (chatState.apiKey || '').trim();
       const historyContents = chatState.messages
         .filter(m => m.plain)
-        .slice(-10)
+        .slice(-8)
         .map(m => ({
           role: m.role === 'user' ? 'user' : 'model',
           parts: [{ text: m.plain }]
@@ -4297,10 +4373,11 @@
       const payload = {
         systemInstruction: { parts: [{ text: buildTopicSystemPrompt() }] },
         contents: historyContents,
-        generationConfig: { temperature: 0.7, maxOutputTokens: 320 }
+        generationConfig: { temperature: 0.6, maxOutputTokens: 200 }
       };
 
-      const models = ['gemini-flash-latest', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'];
+      // Ưu tiên model nhẹ nhất & tiết kiệm token nhất trước
+      const models = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-flash-latest'];
       for (const model of models) {
         try {
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
@@ -4636,6 +4713,116 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
       startVoiceSession();
     }
 
+    // Mascot Visibility, Positioning & Hold-to-Drag Anywhere on Screen
+    function applyMascotVisibilityAndPosition() {
+      const widget = document.getElementById('mascot-widget');
+      if (!widget) return;
+      if (!state.showMascot) {
+        if (chatState.open) closeMascotChat();
+        window.PicVocMascot.hide();
+        widget.classList.add('hidden');
+        return;
+      }
+      widget.classList.remove('hidden');
+
+      if (state.mascotPos && typeof state.mascotPos.left === 'number' && typeof state.mascotPos.top === 'number') {
+        const w = 104;
+        const h = 104;
+        const left = Math.max(8, Math.min(window.innerWidth - w - 8, state.mascotPos.left));
+        const top = Math.max(8, Math.min(window.innerHeight - h - 8, state.mascotPos.top));
+        widget.style.left = left + 'px';
+        widget.style.top = top + 'px';
+        widget.style.right = 'auto';
+        widget.style.bottom = 'auto';
+        const alignLeft = left < window.innerWidth / 2;
+        widget.classList.toggle('items-start', alignLeft);
+        widget.classList.toggle('items-end', !alignLeft);
+      } else {
+        widget.style.left = '';
+        widget.style.top = '';
+        widget.style.right = '';
+        widget.style.bottom = '';
+        widget.classList.remove('items-start');
+        widget.classList.add('items-end');
+      }
+    }
+
+    function initMascotDrag() {
+      const btn = document.getElementById('btn-mascot-avatar');
+      const widget = document.getElementById('mascot-widget');
+      if (!btn || !widget) return;
+
+      let pointerDown = false;
+      let dragging = false;
+      let startX = 0, startY = 0;
+      let offsetX = 0, offsetY = 0;
+
+      function getPt(ev) {
+        return ev.touches && ev.touches[0] ? ev.touches[0] : ev;
+      }
+
+      function onMove(ev) {
+        if (!pointerDown) return;
+        const pt = getPt(ev);
+        const dx = pt.clientX - startX;
+        const dy = pt.clientY - startY;
+        if (!dragging && Math.hypot(dx, dy) > 6) {
+          dragging = true;
+          if (chatState.open) closeMascotChat();
+          window.PicVocMascot.hide();
+        }
+        if (!dragging) return;
+        ev.preventDefault();
+        const rect = widget.getBoundingClientRect();
+        const nextLeft = Math.max(8, Math.min(window.innerWidth - rect.width - 8, pt.clientX - offsetX));
+        const nextTop = Math.max(8, Math.min(window.innerHeight - rect.height - 8, pt.clientY - offsetY));
+        widget.style.left = nextLeft + 'px';
+        widget.style.top = nextTop + 'px';
+        widget.style.right = 'auto';
+        widget.style.bottom = 'auto';
+        const alignLeft = nextLeft < window.innerWidth / 2;
+        widget.classList.toggle('items-start', alignLeft);
+        widget.classList.toggle('items-end', !alignLeft);
+      }
+
+      function onEnd() {
+        if (!pointerDown) return;
+        pointerDown = false;
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onEnd);
+        window.removeEventListener('touchmove', onMove);
+        window.removeEventListener('touchend', onEnd);
+        if (dragging) {
+          dragging = false;
+          window.__kadocMascotJustDragged = true;
+          setTimeout(() => { window.__kadocMascotJustDragged = false; }, 220);
+          const rect = widget.getBoundingClientRect();
+          state.mascotPos = { left: Math.round(rect.left), top: Math.round(rect.top) };
+          saveState();
+        }
+      }
+
+      function onStart(ev) {
+        if (ev.type === 'mousedown' && ev.button !== 0) return;
+        const pt = getPt(ev);
+        const rect = widget.getBoundingClientRect();
+        pointerDown = true;
+        dragging = false;
+        startX = pt.clientX;
+        startY = pt.clientY;
+        offsetX = pt.clientX - rect.left;
+        offsetY = pt.clientY - rect.top;
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onEnd);
+        window.addEventListener('touchmove', onMove, { passive: false });
+        window.addEventListener('touchend', onEnd);
+      }
+
+      btn.addEventListener('mousedown', onStart);
+      btn.addEventListener('touchstart', onStart, { passive: true });
+      window.addEventListener('resize', applyMascotVisibilityAndPosition);
+    }
+
     // Bind Corner Drag-to-Resize on Top-Left Handle
     function initChatResizeHandle() {
       const handle = document.getElementById('mascot-resize-handle');
@@ -4688,6 +4875,8 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
 
     window.addEventListener('DOMContentLoaded', async () => {
       initFloatingMascot();
+      applyMascotVisibilityAndPosition();
+      initMascotDrag();
       initChatResizeHandle();
       const chatForm = document.getElementById('chat-form');
       const chatInputEl = document.getElementById('chat-input');
