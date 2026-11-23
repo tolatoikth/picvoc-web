@@ -4145,8 +4145,7 @@
     function formatAiTextToHtml(text) {
       let safe = escapeHtml(text || '');
       safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-      safe = safe.replace(/
-/g, '<br/>');
+      safe = safe.replace(/\n/g, '<br/>');
       return safe;
     }
 
@@ -4216,8 +4215,7 @@
         '1. Trò chuyện tự nhiên bằng tiếng Anh (ngắn gọn 2-4 câu mỗi lượt) và chủ động lồng ghép 1-2 từ vựng của chủ đề vào câu nói (in đậm **từ đó**).',
         '2. Nếu người dùng diễn đạt gượng, sai ngữ pháp, dùng từ chưa chuẩn hoặc đang cố nói một ý liên quan chủ đề (ví dụ: viết "I like solve problem" khi muốn nói thích giải toán), hãy nhẹ nhàng hướng dẫn cách nói tự nhiên hơn bằng tiếng Việt ngắn gọn kèm câu tiếng Anh chuẩn (ví dụ: "💡 Gợi ý nói tự nhiên: **I like solving math problems**"), rồi hỏi tiếp 1 câu ngắn để duy trì hội thoại.',
         '3. Không dài dòng, không dùng ngôn ngữ máy móc.'
-      ].join('
-');
+      ].join('\n');
     }
 
     async function callGeminiAI(userText) {
@@ -4277,8 +4275,7 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
     }
 
     function extractEnglishSentence(text) {
-      const lines = String(text || '').replace(/\*\*/g, '').split('
-');
+      const lines = String(text || '').replace(/\*\*/g, '').split('\n');
       const enLine = lines.find(l => /[a-zA-Z]{4,}/.test(l) && !/[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(l));
       return enLine ? enLine.trim() : '';
     }
