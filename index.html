@@ -257,13 +257,10 @@
       <!-- Messages Stream -->
       <div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 bg-white"></div>
 
-      <!-- Voice Listening Indicator -->
-      <div id="chat-voice-status" class="hidden px-3 py-1.5 bg-rose-50 border-t border-rose-200 flex items-center justify-between gap-2 shrink-0">
-        <div class="flex items-center gap-2 min-w-0">
-          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping shrink-0"></span>
-          <span id="chat-voice-status-text" class="text-[11px] font-bold text-rose-700 truncate">Đang nghe tiếng Anh... Hãy nói vào micro</span>
-        </div>
-        <button data-action="chat-toggle-voice" type="button" class="text-[11px] font-bold text-rose-600 hover:text-rose-800 shrink-0">Dừng</button>
+      <!-- Clean White-Background Recording Indicator (No Red Box) -->
+      <div id="chat-voice-status" class="hidden px-3.5 pt-1.5 pb-0.5 bg-white border-t border-slate-100 flex items-center gap-1.5 shrink-0">
+        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0"></span>
+        <span id="chat-voice-status-text" class="text-[11px] font-bold text-rose-600 tracking-wide">Recording...</span>
       </div>
 
       <!-- Reply Suggestions Drawer (toggled by Left Suggest Button) -->
@@ -283,15 +280,16 @@
         <div id="chat-suggest-list" class="flex flex-col gap-1"></div>
       </div>
 
-      <!-- Messenger-Style Input Bar: [Suggest] [Text Input] [Voice Mic] [Send] -->
-      <form id="chat-form" class="px-2.5 py-2 border-t border-slate-200 bg-white flex items-center gap-1.5 shrink-0">
+      <!-- Messenger-Style Input Bar: [Suggest] [Auto-Grow Textarea max 4 lines] [Voice Mic] [Send] -->
+      <form id="chat-form" class="px-2.5 py-2 border-t border-slate-200 bg-white flex items-end gap-1.5 shrink-0">
         <button id="chat-suggest-btn" data-action="chat-toggle-suggestions" type="button" title="Gợi ý câu trả lời"
           class="w-9 h-9 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0 transition">
           <i data-lucide="lightbulb" class="w-4 h-4"></i>
         </button>
-        <input id="chat-input" type="text" autocomplete="off"
+        <textarea id="chat-input" rows="1" autocomplete="off"
           placeholder="Nhập tin nhắn..."
-          class="flex-1 min-w-0 px-3.5 py-2 rounded-full bg-slate-100 focus:bg-white border border-slate-200/80 text-xs sm:text-[13px] focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition" />
+          class="flex-1 min-w-0 px-3.5 py-2 rounded-2xl bg-slate-100 focus:bg-white border border-slate-200/80 text-xs sm:text-[13px] leading-5 resize-none overflow-y-auto focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 transition"
+          style="min-height: 36px; max-height: 96px;"></textarea>
         <button id="chat-voice-btn" data-action="chat-toggle-voice" type="button" title="Nói tiếng Anh bằng giọng nói"
           class="w-9 h-9 rounded-full bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200/80 flex items-center justify-center shrink-0 transition">
           <i data-lucide="mic" class="w-4 h-4"></i>
@@ -4118,6 +4116,7 @@
         const inp = document.getElementById('chat-input');
         if (inp && txt) {
           inp.value = txt;
+          autoResizeChatInput();
           inp.focus();
         }
         chatState.suggestOpen = false;
@@ -4157,6 +4156,9 @@
       suggestOpen: false,
       suggestSeed: 0,
       listening: false,
+      voiceManualStop: false,
+      voiceBaseText: '',
+      voiceFinalText: '',
       recognition: null,
       busy: false,
       messages: [],
@@ -4187,6 +4189,7 @@
     }
 
     function closeMascotChat() {
+      if (chatState.listening) stopChatVoice();
       chatState.open = false;
       const panel = document.getElementById('mascot-chat-panel');
       if (panel) {
@@ -4499,15 +4502,25 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
       }
     }
 
+    function autoResizeChatInput() {
+      const inp = document.getElementById('chat-input');
+      if (!inp) return;
+      inp.style.height = 'auto';
+      const maxH = 96; // Tối đa 4 dòng (4 * 20px + 16px padding)
+      const nextH = Math.max(36, Math.min(maxH, inp.scrollHeight));
+      inp.style.height = nextH + 'px';
+      inp.scrollTop = inp.scrollHeight;
+    }
+
     function updateVoiceButtonVisual() {
       const btn = document.getElementById('chat-voice-btn');
       const statusEl = document.getElementById('chat-voice-status');
       const statusText = document.getElementById('chat-voice-status-text');
       if (btn) {
         if (chatState.listening) {
-          btn.className = 'w-9 h-9 rounded-full bg-rose-500 hover:bg-rose-600 text-white border border-rose-500 flex items-center justify-center shrink-0 transition animate-pulse shadow-xs';
+          btn.className = 'w-9 h-9 rounded-full bg-rose-500 hover:bg-rose-600 text-white border border-rose-500 flex items-center justify-center shrink-0 transition shadow-xs';
           btn.innerHTML = '<i data-lucide="square" class="w-3.5 h-3.5"></i>';
-          btn.title = 'Đang nghe... Bấm để dừng';
+          btn.title = 'Recording... Bấm để dừng';
         } else {
           btn.className = 'w-9 h-9 rounded-full bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200/80 flex items-center justify-center shrink-0 transition';
           btn.innerHTML = '<i data-lucide="mic" class="w-4 h-4"></i>';
@@ -4516,37 +4529,34 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
       }
       if (statusEl) statusEl.classList.toggle('hidden', !chatState.listening);
       if (statusText && chatState.listening) {
-        statusText.textContent = `Đang nghe tiếng Anh (${state.accent || 'US'})... Hãy nói vào micro`;
+        statusText.textContent = 'Recording...';
       }
       if (window.lucide) lucide.createIcons();
     }
 
     function stopChatVoice() {
+      chatState.voiceManualStop = true;
       chatState.listening = false;
       if (chatState.recognition) {
-        try { chatState.recognition.stop(); } catch (e) {}
+        try { chatState.recognition.onend = null; chatState.recognition.stop(); } catch (e) {}
         chatState.recognition = null;
       }
       updateVoiceButtonVisual();
     }
 
-    function toggleChatVoice() {
-      if (chatState.listening) {
-        stopChatVoice();
-        return;
-      }
+    function startVoiceSession() {
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!SpeechRec) {
         showToast('Trình duyệt hiện tại chưa hỗ trợ nhận diện giọng nói. Hãy dùng Chrome, Edge hoặc Cốc Cốc.');
+        stopChatVoice();
         return;
       }
       const inp = document.getElementById('chat-input');
-      const baseText = inp ? inp.value.trim() : '';
       try {
         const rec = new SpeechRec();
         rec.lang = state.accent === 'UK' ? 'en-GB' : 'en-US';
         rec.interimResults = true;
-        rec.continuous = false;
+        rec.continuous = true;
         rec.maxAlternatives = 1;
 
         rec.onstart = () => {
@@ -4554,28 +4564,54 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
           updateVoiceButtonVisual();
         };
         rec.onresult = (event) => {
-          let transcript = '';
+          if (!chatState.listening) return;
+          let sessionFinal = '';
+          let sessionInterim = '';
           for (let i = 0; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
+            const piece = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              sessionFinal += piece;
+            } else {
+              sessionInterim += piece;
+            }
           }
+          const combined = [chatState.voiceBaseText, chatState.voiceFinalText, sessionFinal, sessionInterim]
+            .map(s => (s || '').trim())
+            .filter(Boolean)
+            .join(' ');
           if (inp) {
-            inp.value = (baseText ? baseText + ' ' : '') + transcript.trim();
-            inp.focus();
+            inp.value = combined;
+            autoResizeChatInput();
           }
+          rec._lastFinal = sessionFinal;
         };
         rec.onerror = (ev) => {
           const err = ev && ev.error ? ev.error : '';
           if (err === 'not-allowed' || err === 'service-not-allowed') {
             showToast('Bạn cần cho phép quyền Micro trên trình duyệt để dùng giọng nói.');
-          } else if (err !== 'aborted' && err !== 'no-speech') {
-            showToast('Không nghe rõ giọng nói, bạn thử bấm lại micro nhé.');
+            stopChatVoice();
+          } else if (err === 'audio-capture') {
+            showToast('Không tìm thấy micro trên thiết bị của bạn.');
+            stopChatVoice();
           }
-          stopChatVoice();
+          // Với lỗi no-speech hoặc network tạm thời, giữ nguyên trạng thái và để onend tự nối lại nếu người dùng chưa bấm dừng
         };
         rec.onend = () => {
-          chatState.listening = false;
-          chatState.recognition = null;
-          updateVoiceButtonVisual();
+          if (rec._lastFinal && rec._lastFinal.trim()) {
+            chatState.voiceFinalText = [chatState.voiceFinalText, rec._lastFinal.trim()].filter(Boolean).join(' ');
+          }
+          if (!chatState.voiceManualStop && chatState.listening) {
+            // Tự động duy trì ghi âm liên tục cho tới khi người dùng bấm nút dừng hoặc bấm Gửi
+            setTimeout(() => {
+              if (!chatState.voiceManualStop && chatState.listening) {
+                startVoiceSession();
+              }
+            }, 120);
+          } else {
+            chatState.listening = false;
+            chatState.recognition = null;
+            updateVoiceButtonVisual();
+          }
         };
 
         chatState.recognition = rec;
@@ -4584,6 +4620,20 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
         showToast('Không thể bật micro lúc này, bạn thử lại nhé.');
         stopChatVoice();
       }
+    }
+
+    function toggleChatVoice() {
+      if (chatState.listening) {
+        stopChatVoice();
+        return;
+      }
+      const inp = document.getElementById('chat-input');
+      chatState.voiceManualStop = false;
+      chatState.voiceBaseText = inp ? inp.value.trim() : '';
+      chatState.voiceFinalText = '';
+      chatState.listening = true;
+      updateVoiceButtonVisual();
+      startVoiceSession();
     }
 
     // Bind Corner Drag-to-Resize on Top-Left Handle
@@ -4640,6 +4690,22 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
       initFloatingMascot();
       initChatResizeHandle();
       const chatForm = document.getElementById('chat-form');
+      const chatInputEl = document.getElementById('chat-input');
+      if (chatInputEl) {
+        chatInputEl.addEventListener('input', () => {
+          autoResizeChatInput();
+          if (chatState.listening) {
+            chatState.voiceBaseText = chatInputEl.value.trim();
+            chatState.voiceFinalText = '';
+          }
+        });
+        chatInputEl.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter' && !ev.shiftKey) {
+            ev.preventDefault();
+            if (chatForm) chatForm.requestSubmit();
+          }
+        });
+      }
       if (chatForm) {
         chatForm.addEventListener('submit', (ev) => {
           ev.preventDefault();
@@ -4649,6 +4715,7 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
           const val = inp.value.trim();
           if (!val) return;
           inp.value = '';
+          autoResizeChatInput();
           sendChatMessage(val);
         });
       }
