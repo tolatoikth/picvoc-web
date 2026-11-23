@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -108,7 +108,7 @@
           <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
         </button>
         <button id="btn-auth" type="button" title="Tài khoản đồng bộ tiến độ"
-          class="px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-800 flex items-center gap-1.5 transition">
+          class="px-2.5 py-1.5 rounded-full border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-800 flex items-center gap-1.5 transition">
           <i data-lucide="user" class="w-3.5 h-3.5"></i>
           <span id="auth-label" class="hidden sm:inline">Đăng nhập</span>
         </button>
@@ -571,8 +571,31 @@
           .select('vocab_id, is_learned, is_favorite')
           .eq('user_id', state.user.id);
         if (!error && Array.isArray(data)) {
-          state.learned = new Set(data.filter(r => r.is_learned).map(r => r.vocab_id));
-          state.favorites = new Set(data.filter(r => r.is_favorite).map(r => r.vocab_id));
+          const cloudLearned = new Set(data.filter(r => r.is_learned).map(r => r.vocab_id));
+          const cloudFavs = new Set(data.filter(r => r.is_favorite).map(r => r.vocab_id));
+          // Merge any local guest progress up to cloud so user never loses progress on first login
+          const toPush = [];
+          const allLocalIds = new Set([...state.learned, ...state.favorites]);
+          allLocalIds.forEach(vid => {
+            const localL = state.learned.has(vid);
+            const localF = state.favorites.has(vid);
+            if ((localL && !cloudLearned.has(vid)) || (localF && !cloudFavs.has(vid))) {
+              if (localL) cloudLearned.add(vid);
+              if (localF) cloudFavs.add(vid);
+              toPush.push({
+                user_id: state.user.id,
+                vocab_id: vid,
+                is_learned: cloudLearned.has(vid),
+                is_favorite: cloudFavs.has(vid),
+                updated_at: new Date().toISOString()
+              });
+            }
+          });
+          if (toPush.length) {
+            await supabaseClient.from('user_progress').upsert(toPush, { onConflict: 'user_id,vocab_id' });
+          }
+          state.learned = cloudLearned;
+          state.favorites = cloudFavs;
           saveState();
           render();
         }
@@ -729,9 +752,23 @@
         }
       }
 
-      const authLabel = document.getElementById('auth-label');
-      if (authLabel) {
-        authLabel.textContent = state.user ? (state.user.email.split('@')[0].slice(0, 12)) : 'Đăng nhập';
+      const authBtn = document.getElementById('btn-auth');
+      if (authBtn) {
+        if (state.user) {
+          const meta = state.user.user_metadata || {};
+          const avatarUrl = meta.avatar_url || meta.picture || '';
+          const displayName = meta.full_name || meta.name || (state.user.email ? state.user.email.split('@')[0] : 'User');
+          const initial = (displayName || 'U').trim().charAt(0).toUpperCase();
+          authBtn.className = 'p-1 pr-2.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 flex items-center gap-2 transition shadow-2xs';
+          authBtn.title = displayName + ' (' + (state.user.email || '') + ')';
+          authBtn.innerHTML = avatarUrl
+            ? `<div class="relative shrink-0"><img src="${escapeAttr(avatarUrl)}" alt="${escapeAttr(displayName)}" class="w-7 h-7 rounded-full object-cover border border-slate-200" referrerpolicy="no-referrer" /><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white absolute -bottom-0.5 -right-0.5"></span></div><span class="hidden sm:inline text-xs font-bold text-slate-700 max-w-[96px] truncate">${escapeHtml(displayName)}</span>`
+            : `<div class="relative shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-extrabold text-xs flex items-center justify-center shadow-2xs">${escapeHtml(initial)}<span class="w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-white absolute -bottom-0.5 -right-0.5"></span></div><span class="hidden sm:inline text-xs font-bold text-slate-700 max-w-[96px] truncate">${escapeHtml(displayName)}</span>`;
+        } else {
+          authBtn.className = 'px-3 py-1.5 rounded-full border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-xs font-bold text-emerald-800 flex items-center gap-1.5 transition';
+          authBtn.title = 'Đăng nhập để đồng bộ tiến độ học';
+          authBtn.innerHTML = '<i data-lucide="user" class="w-3.5 h-3.5"></i><span class="hidden sm:inline">Đăng nhập</span>';
+        }
       }
     }
 
@@ -1829,63 +1866,147 @@
       });
     }
 
+    function translateAuthError(msg) {
+      const m = String(msg || '').toLowerCase();
+      if (m.includes('email not confirmed')) {
+        return 'Tài khoản này chưa xác nhận email. Hãy mở hòm thư bấm link xác nhận, hoặc tắt mục "Confirm email" trong Supabase (Authentication → Providers → Email) để đăng nhập ngay.';
+      }
+      if (m.includes('invalid login credentials')) {
+        return 'Sai email hoặc mật khẩu. Hãy kiểm tra lại (hoặc nếu bạn vừa tạo tài khoản, thử kiểm tra xem đã tắt "Confirm email" trên Supabase chưa).';
+      }
+      if (m.includes('user already registered')) {
+        return 'Email này đã được đăng ký trước đó. Hãy chuyển sang tab "Đăng nhập" để vào tài khoản.';
+      }
+      if (m.includes('provider is not enabled')) {
+        return 'Bạn chưa bật đăng nhập Google trong Supabase (Authentication → Providers → Google).';
+      }
+      if (m.includes('password should be at least')) {
+        return 'Mật khẩu cần dài tối thiểu 6 ký tự.';
+      }
+      return msg || 'Có lỗi xảy ra, vui lòng thử lại.';
+    }
+
     function openAuthModal() {
       const modal = document.getElementById('auth-modal');
       const card = document.getElementById('auth-modal-card');
       if (!modal || !card) return;
 
       if (state.user) {
+        const meta = state.user.user_metadata || {};
+        const avatarUrl = meta.avatar_url || meta.picture || '';
+        const displayName = meta.full_name || meta.name || (state.user.email ? state.user.email.split('@')[0] : 'Người học');
+        const initial = (displayName || 'U').trim().charAt(0).toUpperCase();
+        const provider = (state.user.app_metadata && state.user.app_metadata.provider) || 'email';
+
         card.innerHTML = `
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-extrabold text-slate-900">Tài khoản đồng bộ</h3>
+            <h3 class="text-lg font-extrabold text-slate-900">Tài khoản của bạn</h3>
             <button data-action="close-auth-modal" type="button" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
               <i data-lucide="x" class="w-4 h-4"></i>
             </button>
           </div>
-          <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 space-y-1">
-            <div class="text-xs font-bold text-emerald-700 uppercase">Đang đăng nhập</div>
-            <div class="text-sm font-extrabold text-slate-900 break-all">${escapeHtml(state.user.email)}</div>
-            <p class="text-xs text-emerald-700">Tiến độ đã thuộc và từ yêu thích của bạn đang được lưu tự động trên Supabase.</p>
+
+          <div class="flex flex-col items-center text-center p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+            ${avatarUrl
+              ? `<img src="${escapeAttr(avatarUrl)}" alt="${escapeAttr(displayName)}" class="w-16 h-16 rounded-full object-cover border-2 border-emerald-500 shadow-sm" referrerpolicy="no-referrer" />`
+              : `<div class="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-extrabold text-2xl flex items-center justify-center shadow-sm">${escapeHtml(initial)}</div>`
+            }
+            <div>
+              <div class="text-base font-extrabold text-slate-900">${escapeHtml(displayName)}</div>
+              <div class="text-xs text-slate-500 break-all">${escapeHtml(state.user.email || '')}</div>
+            </div>
+            <span class="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Đồng bộ Supabase (${provider === 'google' ? 'Google' : 'Email'})
+            </span>
           </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div class="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-100 text-center">
+              <div class="text-xl font-extrabold text-emerald-700">${state.learned.size}/${VOCAB.length}</div>
+              <div class="text-xs font-medium text-emerald-800">Từ đã thuộc</div>
+            </div>
+            <div class="p-3 rounded-2xl bg-amber-50/70 border border-amber-100 text-center">
+              <div class="text-xl font-extrabold text-amber-700">${state.favorites.size}</div>
+              <div class="text-xs font-medium text-amber-800">Từ yêu thích</div>
+            </div>
+          </div>
+
           <button data-action="do-logout" type="button"
-            class="w-full py-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-sm transition">
-            Đăng xuất
+            class="w-full py-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-sm flex items-center justify-center gap-2 transition">
+            <i data-lucide="log-out" class="w-4 h-4"></i>
+            <span>Đăng xuất tài khoản</span>
           </button>
         `;
       } else {
         const isLogin = state.authMode === 'login';
         card.innerHTML = `
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-extrabold text-slate-900">${isLogin ? 'Đăng nhập đồng bộ tiến độ' : 'Tạo tài khoản học mới'}</h3>
+            <div>
+              <h3 class="text-lg font-extrabold text-slate-900">${isLogin ? 'Đăng nhập PicVoc' : 'Tạo tài khoản mới'}</h3>
+              <p class="text-xs text-slate-500 mt-0.5">Đồng bộ từ đã thuộc &amp; yêu thích lên Supabase</p>
+            </div>
             <button data-action="close-auth-modal" type="button" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
               <i data-lucide="x" class="w-4 h-4"></i>
             </button>
           </div>
-          <p class="text-xs text-slate-500">Đăng nhập giúp lưu các từ đã thuộc &amp; yêu thích lên Supabase để học trên nhiều thiết bị và không mất dữ liệu khi đổi giao diện.</p>
-          ${state.authError ? `<div class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700">${escapeHtml(state.authError)}</div>` : ''}
-          ${state.authMessage ? `<div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700">${escapeHtml(state.authMessage)}</div>` : ''}
+
+          <!-- Continue with Google -->
+          <button data-action="do-google-login" type="button" ${state.authBusy ? 'disabled' : ''}
+            class="w-full py-3 px-4 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 font-bold text-sm flex items-center justify-center gap-2.5 shadow-2xs transition">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            <span>Tiếp tục với Google</span>
+          </button>
+
+          <div class="relative flex items-center py-1">
+            <div class="flex-grow border-t border-slate-200"></div>
+            <span class="shrink mx-3 text-[11px] font-semibold text-slate-400 uppercase">hoặc tiếp tục với Email</span>
+            <div class="flex-grow border-t border-slate-200"></div>
+          </div>
+
+          <!-- Switch Tabs -->
+          <div class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl">
+            <button data-action="set-auth-mode" data-mode="login" type="button"
+              class="py-2 rounded-lg text-xs font-bold transition ${isLogin ? 'bg-white text-emerald-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'}">
+              Đăng nhập
+            </button>
+            <button data-action="set-auth-mode" data-mode="signup" type="button"
+              class="py-2 rounded-lg text-xs font-bold transition ${!isLogin ? 'bg-white text-emerald-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'}">
+              Đăng ký mới
+            </button>
+          </div>
+
+          ${state.authError ? `<div class="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-700 leading-relaxed">${escapeHtml(state.authError)}</div>` : ''}
+          ${state.authMessage ? `<div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 leading-relaxed">${escapeHtml(state.authMessage)}</div>` : ''}
+
           <form id="auth-form" class="space-y-3">
+            ${!isLogin ? `
+              <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Tên hiển thị</label>
+                <input id="auth-name" type="text" placeholder="Ví dụ: Khánh"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
+              </div>
+            ` : ''}
             <div>
               <label class="block text-xs font-bold text-slate-600 mb-1">Email</label>
-              <input id="auth-email" type="email" required placeholder="ban@example.com"
+              <input id="auth-email" type="email" required placeholder="ban@gmail.com"
                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-600 mb-1">Mật khẩu (tối thiểu 6 ký tự)</label>
-              <input id="auth-password" type="password" minlength="6" required placeholder="••••••"
+              <input id="auth-password" type="password" minlength="6" required placeholder="Nhập mật khẩu..."
                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
             </div>
             <button type="submit" ${state.authBusy ? 'disabled' : ''}
               class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition">
-              ${state.authBusy ? 'Đang xử lý...' : (isLogin ? 'Đăng nhập' : 'Đăng ký tài khoản')}
+              ${state.authBusy ? 'Đang xử lý...' : (isLogin ? 'Đăng nhập bằng Email' : 'Tạo tài khoản & Vào học')}
             </button>
           </form>
-          <div class="text-center text-xs text-slate-500">
-            ${isLogin ? 'Chưa có tài khoản?' : 'Đã có tài khoản?'}
-            <button data-action="toggle-auth-mode" type="button" class="font-bold text-emerald-700 hover:underline ml-1">
-              ${isLogin ? 'Đăng ký ngay' : 'Đăng nhập'}
-            </button>
-          </div>
         `;
 
         const form = document.getElementById('auth-form');
@@ -1899,26 +2020,48 @@
             }
             const email = document.getElementById('auth-email').value.trim();
             const password = document.getElementById('auth-password').value;
+            const nameEl = document.getElementById('auth-name');
+            const fullName = nameEl ? nameEl.value.trim() : '';
             state.authBusy = true;
             state.authError = '';
             state.authMessage = '';
             openAuthModal();
             try {
               if (state.authMode === 'login') {
-                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) state.authError = error.message;
-                else {
+                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) {
+                  state.authError = translateAuthError(error.message);
+                } else {
+                  state.user = data.user;
+                  state.authBusy = false;
                   closeAuthModal();
+                  await loadUserProgressFromCloud();
                   showToast('Đăng nhập thành công!');
+                  render();
                   return;
                 }
               } else {
-                const { error } = await supabaseClient.auth.signUp({ email, password });
-                if (error) state.authError = error.message;
-                else state.authMessage = 'Đăng ký thành công! Nếu Supabase yêu cầu xác nhận email, hãy mở hộp thư để kích hoạt rồi đăng nhập.';
+                const { data, error } = await supabaseClient.auth.signUp({
+                  email,
+                  password,
+                  options: fullName ? { data: { full_name: fullName } } : undefined
+                });
+                if (error) {
+                  state.authError = translateAuthError(error.message);
+                } else if (data && data.session && data.user) {
+                  state.user = data.user;
+                  state.authBusy = false;
+                  closeAuthModal();
+                  await loadUserProgressFromCloud();
+                  showToast('Tạo tài khoản và đăng nhập thành công!');
+                  render();
+                  return;
+                } else {
+                  state.authMessage = 'Đã tạo tài khoản! Vì Supabase đang bật xác nhận email, hãy mở hộp thư bấm link xác nhận (hoặc tắt "Confirm email" trên Supabase) rồi đăng nhập.';
+                }
               }
             } catch (err) {
-              state.authError = 'Có lỗi kết nối, vui lòng thử lại.';
+              state.authError = 'Có lỗi kết nối tới Supabase, vui lòng thử lại.';
             }
             state.authBusy = false;
             openAuthModal();
@@ -2061,11 +2204,38 @@
       }
       if (action === 'close-voice-modal') { closeVoiceModal(); return; }
       if (action === 'close-auth-modal') { closeAuthModal(); return; }
-      if (action === 'toggle-auth-mode') {
-        state.authMode = state.authMode === 'login' ? 'signup' : 'login';
+      if (action === 'set-auth-mode') {
+        state.authMode = actEl.dataset.mode === 'signup' ? 'signup' : 'login';
         state.authError = '';
         state.authMessage = '';
         openAuthModal();
+        return;
+      }
+      if (action === 'do-google-login') {
+        if (!supabaseClient) {
+          state.authError = 'Chưa kết nối được tới Supabase.';
+          openAuthModal();
+          return;
+        }
+        state.authBusy = true;
+        state.authError = '';
+        openAuthModal();
+        try {
+          const redirectUrl = window.location.origin + window.location.pathname;
+          const { error } = await supabaseClient.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: redirectUrl }
+          });
+          if (error) {
+            state.authError = translateAuthError(error.message);
+            state.authBusy = false;
+            openAuthModal();
+          }
+        } catch (err) {
+          state.authError = 'Không thể mở đăng nhập Google lúc này.';
+          state.authBusy = false;
+          openAuthModal();
+        }
         return;
       }
       if (action === 'do-logout') {
