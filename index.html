@@ -179,11 +179,9 @@
     <div id="onboarding-modal-card" class="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 animate-pop border border-slate-200 space-y-4"></div>
   </div>
 
-  <!-- Floating 3D Chibi Mascot Widget + Resizable AI Chat Panel -->
-  <div id="mascot-widget" class="fixed bottom-16 md:bottom-5 right-3 sm:right-5 z-40 flex flex-col items-end pointer-events-none">
-    <!-- Resizable Rectangular AI Chat Box -->
-    <div id="mascot-chat-panel" style="width: 360px; height: 470px;"
-      class="hidden pointer-events-auto mb-2 relative bg-white/95 backdrop-blur-md border border-slate-200 shadow-2xl rounded-2xl flex flex-col overflow-hidden animate-bubble max-w-[94vw] max-h-[78vh]">
+  <!-- Independent Floating Resizable AI Chat Panel (always clamped inside viewport) -->
+  <div id="mascot-chat-panel" style="width: 360px; height: 470px;"
+    class="hidden fixed z-40 bg-white/95 backdrop-blur-md border border-slate-200 shadow-2xl rounded-2xl flex flex-col overflow-hidden animate-bubble max-w-[94vw] max-h-[78vh]">
       <!-- Top-Left Corner Resize Handle -->
       <button id="mascot-resize-handle" type="button" title="Kéo góc này để chỉnh độ rộng &amp; chiều cao ô chat"
         class="absolute top-0 left-0 z-20 w-6 h-6 cursor-nwse-resize flex items-start justify-start p-1 text-slate-400 hover:text-emerald-600 transition">
@@ -301,21 +299,22 @@
       </form>
     </div>
 
-    <!-- Modern Glass Speech Bubble (Greeting / Future Notifications) -->
-    <div id="mascot-bubble" class="hidden pointer-events-auto mb-1.5 mr-1 max-w-[235px] sm:max-w-[265px] bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-lg rounded-2xl rounded-br-sm px-3.5 py-2.5 animate-bubble">
-      <div class="flex items-start justify-between gap-2">
-        <div id="mascot-bubble-content" class="text-xs sm:text-[13px] text-slate-700 leading-snug"></div>
-        <button id="btn-mascot-close-bubble" type="button" aria-label="Đóng lời chào"
-          class="text-slate-400 hover:text-slate-700 p-0.5 -mr-1 -mt-0.5 rounded-md transition shrink-0">
-          <i data-lucide="x" class="w-3.5 h-3.5"></i>
-        </button>
-      </div>
-      <div id="mascot-bubble-actions" class="hidden mt-2 pt-2 border-t border-slate-100 flex items-center gap-2"></div>
+  <!-- Independent Glass Speech Bubble (always clamped inside viewport near mascot) -->
+  <div id="mascot-bubble" class="hidden fixed z-40 max-w-[235px] sm:max-w-[265px] bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-lg rounded-2xl px-3.5 py-2.5 animate-bubble">
+    <div class="flex items-start justify-between gap-2">
+      <div id="mascot-bubble-content" class="text-xs sm:text-[13px] text-slate-700 leading-snug"></div>
+      <button id="btn-mascot-close-bubble" type="button" aria-label="Đóng lời chào"
+        class="text-slate-400 hover:text-slate-700 p-0.5 -mr-1 -mt-0.5 rounded-md transition shrink-0">
+        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+      </button>
     </div>
+    <div id="mascot-bubble-actions" class="hidden mt-2 pt-2 border-t border-slate-100 flex items-center gap-2"></div>
+  </div>
 
-    <!-- 3D Chibi Canvas Container (Click to open KaDoc AI, Hold & Drag to move anywhere) -->
-    <button id="btn-mascot-avatar" type="button" title="Chạm để mở KaDoc AI • Nhấn giữ và kéo để di chuyển khắp màn hình"
-      class="pointer-events-auto relative w-[92px] h-[92px] sm:w-[104px] sm:h-[104px] rounded-full focus:outline-none group transition-transform hover:scale-105 active:scale-95 cursor-grab active:cursor-grabbing select-none touch-none">
+  <!-- Floating 3D Chibi Mascot Avatar ONLY (Strictly clamped inside screen bounds) -->
+  <div id="mascot-widget" class="fixed bottom-16 md:bottom-5 right-3 sm:right-5 z-40 w-[92px] h-[92px] sm:w-[104px] sm:h-[104px]">
+    <button id="btn-mascot-avatar" type="button" title="Chạm để mở KaDoc AI • Nhấn giữ và kéo để di chuyển quanh màn hình"
+      class="relative w-full h-full rounded-full focus:outline-none group transition-transform hover:scale-105 active:scale-95 cursor-grab active:cursor-grabbing select-none touch-none">
       <div class="absolute inset-2 rounded-full bg-gradient-to-tr from-emerald-100/80 via-white/90 to-teal-50/80 border border-white shadow-md group-hover:shadow-lg transition"></div>
       <canvas id="mascot-canvas" class="relative z-10 w-full h-full block"></canvas>
     </button>
@@ -3917,6 +3916,7 @@
           }
         }
         bubble.classList.remove('hidden');
+        positionBubbleNearMascot();
         if (floatingMascotViewer) floatingMascotViewer.bounce();
         if (window.lucide) lucide.createIcons();
         clearTimeout(bubbleTimer);
@@ -4235,15 +4235,10 @@
       chatState.open = true;
       window.PicVocMascot.hide();
       const panel = document.getElementById('mascot-chat-panel');
-      const widget = document.getElementById('mascot-widget');
       if (panel) {
         panel.classList.remove('hidden');
         panel.classList.add('flex');
-      }
-      if (widget && state.mascotPos) {
-        const openBelow = state.mascotPos.top < Math.min(420, window.innerHeight * 0.45);
-        widget.classList.toggle('flex-col-reverse', openBelow);
-        widget.classList.toggle('flex-col', !openBelow);
+        positionChatPanelNearMascot();
       }
       if (!chatState.messages.length) {
         chatState.messages.push({ role: 'ai', html: getChatIntroMessage(), plain: '' });
@@ -4262,11 +4257,6 @@
       if (panel) {
         panel.classList.add('hidden');
         panel.classList.remove('flex');
-      }
-      const widget = document.getElementById('mascot-widget');
-      if (widget) {
-        widget.classList.remove('flex-col-reverse');
-        widget.classList.add('flex-col');
       }
     }
 
@@ -4713,7 +4703,74 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
       startVoiceSession();
     }
 
-    // Mascot Visibility, Positioning & Hold-to-Drag Anywhere on Screen
+    // Mascot Visibility, Strict Viewport Clamping & Smart Overlay Positioning
+    function getMascotSafeBounds() {
+      const vw = document.documentElement.clientWidth || window.innerWidth;
+      const vh = document.documentElement.clientHeight || window.innerHeight;
+      const pad = 12;
+      const bottomPad = vw < 768 ? 72 : 16;
+      return { vw, vh, pad, bottomPad };
+    }
+
+    function positionChatPanelNearMascot() {
+      const panel = document.getElementById('mascot-chat-panel');
+      const widget = document.getElementById('mascot-widget');
+      if (!panel || !widget || panel.classList.contains('hidden')) return;
+
+      const { vw, vh, pad, bottomPad } = getMascotSafeBounds();
+      const mRect = widget.getBoundingClientRect();
+      const pRect = panel.getBoundingClientRect();
+      const pw = Math.min(pRect.width || 360, vw - pad * 2);
+      const ph = Math.min(pRect.height || 470, vh - pad - bottomPad);
+
+      // Đặt khung chat ưu tiên phía trên linh vật; nếu không đủ chỗ thì mở xuống dưới hoặc sang bên cạnh
+      let left = (mRect.left + mRect.width / 2 > vw / 2)
+        ? (mRect.right - pw)
+        : mRect.left;
+      let top = mRect.top - ph - 10;
+      if (top < pad) {
+        const belowTop = mRect.bottom + 10;
+        if (belowTop + ph <= vh - bottomPad) {
+          top = belowTop;
+        } else {
+          top = Math.max(pad, Math.min(vh - ph - bottomPad, mRect.bottom - ph));
+          if (mRect.left - pw - 10 >= pad) left = mRect.left - pw - 10;
+          else if (mRect.right + pw + 10 <= vw - pad) left = mRect.right + 10;
+        }
+      }
+
+      // Khóa chặt khung chat trong màn hình
+      left = Math.max(pad, Math.min(vw - pw - pad, left));
+      top = Math.max(pad, Math.min(vh - ph - bottomPad, top));
+      panel.style.left = Math.round(left) + 'px';
+      panel.style.top = Math.round(top) + 'px';
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+    }
+
+    function positionBubbleNearMascot() {
+      const bubble = document.getElementById('mascot-bubble');
+      const widget = document.getElementById('mascot-widget');
+      if (!bubble || !widget || bubble.classList.contains('hidden')) return;
+
+      const { vw, vh, pad, bottomPad } = getMascotSafeBounds();
+      const mRect = widget.getBoundingClientRect();
+      const bRect = bubble.getBoundingClientRect();
+      const bw = bRect.width || 240;
+      const bh = bRect.height || 64;
+
+      let left = (mRect.left + mRect.width / 2 > vw / 2) ? (mRect.right - bw) : mRect.left;
+      let top = mRect.top - bh - 8;
+      if (top < pad) top = mRect.bottom + 8;
+
+      left = Math.max(pad, Math.min(vw - bw - pad, left));
+      top = Math.max(pad, Math.min(vh - bh - bottomPad, top));
+      bubble.style.left = Math.round(left) + 'px';
+      bubble.style.top = Math.round(top) + 'px';
+      bubble.style.right = 'auto';
+      bubble.style.bottom = 'auto';
+    }
+
     function applyMascotVisibilityAndPosition() {
       const widget = document.getElementById('mascot-widget');
       if (!widget) return;
@@ -4725,26 +4782,27 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
       }
       widget.classList.remove('hidden');
 
+      const { vw, vh, pad, bottomPad } = getMascotSafeBounds();
+      const rect = widget.getBoundingClientRect();
+      const w = rect.width || 104;
+      const h = rect.height || 104;
+
       if (state.mascotPos && typeof state.mascotPos.left === 'number' && typeof state.mascotPos.top === 'number') {
-        const w = 104;
-        const h = 104;
-        const left = Math.max(8, Math.min(window.innerWidth - w - 8, state.mascotPos.left));
-        const top = Math.max(8, Math.min(window.innerHeight - h - 8, state.mascotPos.top));
-        widget.style.left = left + 'px';
-        widget.style.top = top + 'px';
+        const left = Math.max(pad, Math.min(vw - w - pad, state.mascotPos.left));
+        const top = Math.max(pad, Math.min(vh - h - bottomPad, state.mascotPos.top));
+        widget.style.left = Math.round(left) + 'px';
+        widget.style.top = Math.round(top) + 'px';
         widget.style.right = 'auto';
         widget.style.bottom = 'auto';
-        const alignLeft = left < window.innerWidth / 2;
-        widget.classList.toggle('items-start', alignLeft);
-        widget.classList.toggle('items-end', !alignLeft);
+        state.mascotPos = { left: Math.round(left), top: Math.round(top) };
       } else {
         widget.style.left = '';
         widget.style.top = '';
         widget.style.right = '';
         widget.style.bottom = '';
-        widget.classList.remove('items-start');
-        widget.classList.add('items-end');
       }
+      positionChatPanelNearMascot();
+      positionBubbleNearMascot();
     }
 
     function initMascotDrag() {
@@ -4773,16 +4831,14 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
         }
         if (!dragging) return;
         ev.preventDefault();
+        const { vw, vh, pad, bottomPad } = getMascotSafeBounds();
         const rect = widget.getBoundingClientRect();
-        const nextLeft = Math.max(8, Math.min(window.innerWidth - rect.width - 8, pt.clientX - offsetX));
-        const nextTop = Math.max(8, Math.min(window.innerHeight - rect.height - 8, pt.clientY - offsetY));
-        widget.style.left = nextLeft + 'px';
-        widget.style.top = nextTop + 'px';
+        const nextLeft = Math.max(pad, Math.min(vw - rect.width - pad, pt.clientX - offsetX));
+        const nextTop = Math.max(pad, Math.min(vh - rect.height - bottomPad, pt.clientY - offsetY));
+        widget.style.left = Math.round(nextLeft) + 'px';
+        widget.style.top = Math.round(nextTop) + 'px';
         widget.style.right = 'auto';
         widget.style.bottom = 'auto';
-        const alignLeft = nextLeft < window.innerWidth / 2;
-        widget.classList.toggle('items-start', alignLeft);
-        widget.classList.toggle('items-end', !alignLeft);
       }
 
       function onEnd() {
@@ -4796,8 +4852,13 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
           dragging = false;
           window.__kadocMascotJustDragged = true;
           setTimeout(() => { window.__kadocMascotJustDragged = false; }, 220);
+          const { vw, vh, pad, bottomPad } = getMascotSafeBounds();
           const rect = widget.getBoundingClientRect();
-          state.mascotPos = { left: Math.round(rect.left), top: Math.round(rect.top) };
+          const clampedLeft = Math.max(pad, Math.min(vw - rect.width - pad, Math.round(rect.left)));
+          const clampedTop = Math.max(pad, Math.min(vh - rect.height - bottomPad, Math.round(rect.top)));
+          widget.style.left = clampedLeft + 'px';
+          widget.style.top = clampedTop + 'px';
+          state.mascotPos = { left: clampedLeft, top: clampedTop };
           saveState();
         }
       }
@@ -4841,6 +4902,7 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
         const nextH = Math.max(330, Math.min(maxH, startH + dy));
         panel.style.width = nextW + 'px';
         panel.style.height = nextH + 'px';
+        positionChatPanelNearMascot();
       }
       function onEnd() {
         resizing = false;
