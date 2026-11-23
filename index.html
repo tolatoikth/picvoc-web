@@ -299,6 +299,7 @@
         description: row.description || '',
         icon: row.icon || 'book-open',
         sortOrder: row.sort_order || 0,
+        coverUrl: row.cover_url || '',
         ...style
       };
     }
@@ -343,7 +344,8 @@
           preferredUSVoice: state.preferredUSVoice,
           preferredUKVoice: state.preferredUKVoice,
           useRealDictAudio: state.useRealDictAudio,
-          profile: state.profile
+          profile: state.profile,
+          topicStates: state.topicStates
         }));
       } catch (e) {}
     }
@@ -374,6 +376,12 @@
         dailyGoal: (saved.profile && saved.profile.dailyGoal) || 10,
         onboarded: Boolean(saved.profile && saved.profile.onboarded)
       },
+      topicStates: (saved.topicStates && typeof saved.topicStates === 'object') ? saved.topicStates : {},
+      topicTab: 'all', // all | fav | recent | ready
+      topicGroup: 'all', // all | 1..10
+      topicSearch: '',
+      favSubTab: 'words', // words | topics
+      highlightWordId: null,
       obDraftNickname: '',
       obDraftMascot: 'cat',
       obDraftGoal: 10,
@@ -665,6 +673,7 @@
         if (data && data.session && data.session.user) {
           state.user = data.session.user;
           await loadUserProgressFromCloud();
+          await loadTopicStatesFromCloud();
           await loadUserProfileFromCloud(true);
         } else {
           // Guest welcome greeting once per page load
@@ -675,11 +684,184 @@
           state.user = session ? session.user : null;
           if (state.user && (event === 'SIGNED_IN' || state.user.id !== prevUid)) {
             await loadUserProgressFromCloud();
+          await loadTopicStatesFromCloud();
             await loadUserProfileFromCloud(true);
           }
           render();
         });
       } catch (e) {}
+    }
+
+
+    // =========================================================
+    // 3B. TOPIC FAVORITES, RECENT RESUME & REAL-LIFE PHOTO ENGINE
+    // =========================================================
+    const TOPIC_GROUPS = [
+      { id: '1',  min: 1,  max: 10,  label: '1. Con người & Giao tiếp (1–10)' },
+      { id: '2',  min: 11, max: 20,  label: '2. Cơ thể & Sức khỏe (11–20)' },
+      { id: '3',  min: 21, max: 30,  label: '3. Ẩm thực & Nhà bếp (21–30)' },
+      { id: '4',  min: 31, max: 40,  label: '4. Nhà cửa & Đời sống (31–40)' },
+      { id: '5',  min: 41, max: 50,  label: '5. Thời trang & Tài chính (41–50)' },
+      { id: '6',  min: 51, max: 60,  label: '6. Thiên nhiên & Động vật (51–60)' },
+      { id: '7',  min: 61, max: 70,  label: '7. Giao thông & Du lịch (61–70)' },
+      { id: '8',  min: 71, max: 80,  label: '8. Nghề nghiệp & Kinh doanh (71–80)' },
+      { id: '9',  min: 81, max: 90,  label: '9. Khoa học & Công nghệ (81–90)' },
+      { id: '10', min: 91, max: 100, label: '10. Giải trí & Nghệ thuật (91–100)' }
+    ];
+
+    // Real-life Wikimedia photography mapping for concrete topics (null = abstract topic -> clean typography, zero AI art!)
+    const TOPIC_WIKI_PHOTO = {
+      'education': 'University', 'polite': 'Handshake', 'character-personality': null, 'family': 'Family',
+      'emotions': null, 'appearance': 'Portrait', 'life-stages': 'Wedding', 'communication': 'Public_speaking',
+      'social-issues': 'Volunteering', 'culture-tradition': 'Temple_of_Literature,_Hanoi',
+      'human-body': 'Human_skeleton', 'health-illness': 'Stethoscope', 'hospital-medicine': 'Hospital',
+      'dental-care': 'Toothbrush', 'fitness-workout': 'Gym', 'nutrition-diet': 'Healthy_diet',
+      'mental-health': 'Meditation', 'first-aid': 'First_aid_kit', 'senses-actions': null, 'aging-wellness': 'Yoga',
+      'fruits': 'Fruit', 'vegetables': 'Vegetable', 'meat-seafood': 'Seafood', 'bakery-sweets': 'Bakery',
+      'drinks-beverages': 'Coffee', 'spices-ingredients': 'Spice', 'cooking-methods': 'Cooking',
+      'kitchenware': 'Cookware_and_bakeware', 'restaurant-dining': 'Restaurant', 'fast-food-snacks': 'Hamburger',
+      'house-rooms': 'House', 'living-room': 'Living_room', 'bedroom': 'Bedroom', 'bathroom': 'Bathroom',
+      'garden-yard': 'Garden', 'home-appliances': 'Kitchen', 'housework-chores': 'Vacuum_cleaner',
+      'daily-routines': null, 'tools-repair': 'Hand_tool', 'renting-housing': 'Apartment',
+      'clothing': 'Clothing', 'footwear-accessories': 'Sneakers', 'fabrics-patterns': 'Textile',
+      'cosmetics-beauty': 'Cosmetics', 'shopping-store': 'Shopping_mall', 'supermarket': 'Supermarket',
+      'money-banking': 'Banknote', 'personal-finance': 'Piggy_bank', 'economy-trade': 'Container_ship',
+      'ecommerce-delivery': 'Package_delivery',
+      'wild-animals': 'Lion', 'pets-farm-animals': 'Golden_Retriever', 'birds': 'Bald_eagle',
+      'sea-creatures': 'Coral_reef', 'insects-reptiles': 'Monarch_butterfly', 'plants-flowers': 'Flower',
+      'weather-seasons': 'Rainbow', 'geography-landscapes': 'Beach', 'natural-disasters': 'Tropical_cyclone',
+      'environment-energy': 'Wind_turbine',
+      'vehicles-transport': 'High-speed_rail', 'driving-traffic': 'Traffic_light', 'airport-flying': 'Commercial_aircraft',
+      'hotel-accommodation': 'Hotel', 'tourism-sightseeing': 'Ha_Long_Bay', 'camping-adventure': 'Camping',
+      'city-buildings': 'Skyline', 'directions-maps': 'Compass', 'architecture-construction': 'Skyscraper',
+      'urban-life': 'Countryside',
+      'jobs-occupations': 'Firefighter', 'office-stationery': 'Office', 'job-interview': 'Job_interview',
+      'workplace-management': 'Meeting', 'business-startup': 'Coworking', 'marketing-advertising': 'Times_Square',
+      'manufacturing-engineering': 'Industrial_robot', 'agriculture-farming': 'Rice_terrace',
+      'law-justice': 'Courthouse', 'government-politics': 'Parliament',
+      'computers-hardware': 'Laptop', 'internet-software': 'Server_room', 'ai-future-tech': 'Humanoid_robot',
+      'science-research': 'Microscope', 'physics-chemistry': 'Chemistry', 'biology-genetics': 'DNA',
+      'space-astronomy': 'Earth', 'math-numbers': 'Abacus', 'shapes-measurements': null, 'time-calendar': 'Clock',
+      'sports-games': 'Running', 'ball-water-sports': 'Association_football', 'music-instruments': 'Acoustic_guitar',
+      'art-painting': 'Oil_painting', 'movies-theater': 'Movie_theater', 'books-literature': 'Library',
+      'media-news': 'Newspaper', 'hobbies-crafts': 'Camera', 'festivals-holidays': 'Fireworks', 'colors-adjectives': null
+    };
+
+    const PHOTO_CACHE_KEY = 'kadoc_real_photos_v1';
+    let photoCache = {};
+    try { photoCache = JSON.parse(localStorage.getItem(PHOTO_CACHE_KEY) || '{}'); } catch (e) {}
+    const photoInFlight = new Set();
+
+    function savePhotoCache() {
+      try { localStorage.setItem(PHOTO_CACHE_KEY, JSON.stringify(photoCache)); } catch (e) {}
+    }
+
+    function getTopicCoverUrl(t) {
+      if (t.coverUrl) return t.coverUrl;
+      if (photoCache[t.id]) return photoCache[t.id];
+      return '';
+    }
+
+    function hydrateTopicPhotos(visibleTopics) {
+      visibleTopics.forEach(t => {
+        if (t.coverUrl || photoCache[t.id] || photoInFlight.has(t.id)) return;
+        const wikiTitle = TOPIC_WIKI_PHOTO[t.id];
+        if (!wikiTitle) return; // Abstract topic -> intentionally keep clean typography, no AI art
+        photoInFlight.add(t.id);
+        fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(wikiTitle))
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            const url = data && data.thumbnail && data.thumbnail.source ? data.thumbnail.source : '';
+            if (url) {
+              photoCache[t.id] = url;
+              savePhotoCache();
+              const imgEl = document.querySelector(`img[data-topic-cover="${t.id}"]`);
+              const wrapEl = document.querySelector(`[data-topic-cover-wrap="${t.id}"]`);
+              if (imgEl && wrapEl) {
+                imgEl.src = url;
+                imgEl.classList.remove('hidden');
+                const fb = wrapEl.querySelector('[data-cover-fallback]');
+                if (fb) fb.classList.add('hidden');
+              }
+            }
+          })
+          .catch(() => {})
+          .finally(() => photoInFlight.delete(t.id));
+      });
+    }
+
+    function getTopicState(topicId) {
+      return state.topicStates[topicId] || { isFavorite: false, lastWordId: '', lastMode: 'learn', lastStudiedAt: null };
+    }
+
+    async function loadTopicStatesFromCloud() {
+      if (!supabaseClient || !state.user) return;
+      try {
+        const { data, error } = await supabaseClient
+          .from('user_topic_state')
+          .select('topic_id, is_favorite, last_word_id, last_mode, last_studied_at')
+          .eq('user_id', state.user.id);
+        if (!error && Array.isArray(data)) {
+          const merged = { ...state.topicStates };
+          data.forEach(r => {
+            merged[r.topic_id] = {
+              isFavorite: Boolean(r.is_favorite),
+              lastWordId: r.last_word_id || '',
+              lastMode: r.last_mode || 'learn',
+              lastStudiedAt: r.last_studied_at || null
+            };
+          });
+          state.topicStates = merged;
+          saveState();
+          render();
+        }
+      } catch (e) {}
+    }
+
+    async function syncTopicStateToCloud(topicId) {
+      if (!supabaseClient || !state.user) return;
+      const ts = getTopicState(topicId);
+      try {
+        await supabaseClient.from('user_topic_state').upsert({
+          user_id: state.user.id,
+          topic_id: topicId,
+          is_favorite: Boolean(ts.isFavorite),
+          last_word_id: ts.lastWordId || '',
+          last_mode: ts.lastMode || 'learn',
+          last_studied_at: ts.lastStudiedAt || new Date().toISOString()
+        }, { onConflict: 'user_id,topic_id' });
+      } catch (e) {}
+    }
+
+    function toggleFavoriteTopic(topicId) {
+      const prev = getTopicState(topicId);
+      const nextFav = !prev.isFavorite;
+      state.topicStates[topicId] = { ...prev, isFavorite: nextFav };
+      saveState();
+      syncTopicStateToCloud(topicId);
+      showToast(nextFav ? 'Đã thêm vào Chủ đề yêu thích' : 'Đã bỏ khỏi Chủ đề yêu thích');
+      render();
+    }
+
+    function recordTopicStudy(topicId, wordId, mode) {
+      if (!topicId || topicId === 'all') return;
+      const prev = getTopicState(topicId);
+      state.topicStates[topicId] = {
+        ...prev,
+        lastWordId: wordId || prev.lastWordId || '',
+        lastMode: mode || prev.lastMode || 'learn',
+        lastStudiedAt: new Date().toISOString()
+      };
+      saveState();
+      syncTopicStateToCloud(topicId);
+    }
+
+    function getRecentTopics(limit = 4) {
+      return TOPICS
+        .map(t => ({ topic: t, st: getTopicState(t.id) }))
+        .filter(x => x.st.lastStudiedAt)
+        .sort((a, b) => new Date(b.st.lastStudiedAt) - new Date(a.st.lastStudiedAt))
+        .slice(0, limit);
     }
 
     // =========================================================
@@ -822,6 +1004,94 @@
     }
 
     // ==================== HOME VIEW ====================
+    function renderTopicCard(t) {
+      const prog = getTopicProgress(t.id);
+      const words = getWordsByTopic(t.id);
+      const ts = getTopicState(t.id);
+      const coverUrl = getTopicCoverUrl(t);
+      const hasWords = words.length > 0;
+      const lastWordObj = ts.lastWordId ? VOCAB.find(x => x.id === ts.lastWordId) : null;
+
+      return `
+        <div class="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs card-hover flex flex-col justify-between">
+          <div>
+            <!-- Real-world Photo Cover (or clean typographic header for abstract topics — zero AI cartoons) -->
+            <div data-topic-cover-wrap="${escapeAttr(t.id)}" class="relative h-32 ${t.accentBg} overflow-hidden border-b border-slate-100">
+              <img data-topic-cover="${escapeAttr(t.id)}" src="${escapeAttr(coverUrl)}" alt="${escapeAttr(t.name)}"
+                loading="lazy"
+                onerror="this.classList.add('hidden'); this.nextElementSibling.classList.remove('hidden');"
+                class="w-full h-full object-cover ${coverUrl ? '' : 'hidden'}" />
+              <div data-cover-fallback class="w-full h-full flex flex-col items-center justify-center px-4 text-center ${coverUrl ? 'hidden' : ''}">
+                <span class="text-[11px] font-bold uppercase tracking-widest ${t.accentText} opacity-75">#${t.sortOrder || ''}</span>
+                <span class="text-xl font-extrabold ${t.accentText} tracking-tight mt-0.5">${escapeHtml(t.name)}</span>
+              </div>
+              <div class="absolute inset-0 bg-gradient-to-t from-slate-900/55 via-slate-900/10 to-transparent pointer-events-none ${coverUrl ? '' : 'opacity-0'}"></div>
+
+              <!-- Top badges -->
+              <span class="absolute top-2.5 left-2.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/90 text-slate-800 shadow-2xs">
+                #${t.sortOrder || ''} • ${hasWords ? `${words.length} từ` : 'Sắp cập nhật'}
+              </span>
+              <button data-action="toggle-fav-topic" data-topic="${escapeAttr(t.id)}" type="button" title="Yêu thích chủ đề"
+                class="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-white border border-slate-200/80 flex items-center justify-center shadow-2xs transition hover:scale-105">
+                <i data-lucide="star" class="w-4 h-4 ${ts.isFavorite ? 'text-amber-400 fill-amber-400' : 'text-slate-400'}"></i>
+              </button>
+            </div>
+
+            <!-- Card Body -->
+            <div class="p-4">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <h3 class="text-base font-extrabold text-slate-900 truncate">${escapeHtml(t.name)}</h3>
+                  <p class="text-xs font-semibold ${t.accentText} truncate">${escapeHtml(t.viName)}</p>
+                </div>
+                ${hasWords ? `<span class="text-xs font-extrabold ${t.accentText} shrink-0">${prog.pct}%</span>` : ''}
+              </div>
+              <p class="text-xs text-slate-500 mt-1.5 line-clamp-2 min-h-[32px]">${escapeHtml(t.description)}</p>
+
+              ${hasWords ? `
+                <div class="mt-3">
+                  <div class="flex justify-between text-[11px] text-slate-500 mb-1">
+                    <span>${lastWordObj ? `Dừng ở: <strong class="text-slate-700">${escapeHtml(lastWordObj.word)}</strong>` : 'Tiến độ đã thuộc'}</span>
+                    <span class="font-semibold text-slate-700">${prog.done}/${prog.total}</span>
+                  </div>
+                  <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div class="${t.barBg} h-full rounded-full transition-all duration-300" style="width: ${prog.pct}%"></div>
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="px-4 pb-4 pt-1">
+            ${hasWords ? `
+              <div class="grid grid-cols-3 gap-1.5">
+                <button data-action="open-topic-learn" data-topic="${escapeAttr(t.id)}" type="button"
+                  class="py-2 px-1.5 rounded-xl ${t.badgeBg} hover:opacity-95 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition">
+                  <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                  <span>Học từ</span>
+                </button>
+                <button data-action="open-topic-flashcard" data-topic="${escapeAttr(t.id)}" type="button"
+                  class="py-2 px-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold flex items-center justify-center gap-1 transition">
+                  <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                  <span>Thẻ</span>
+                </button>
+                <button data-action="open-topic-quiz" data-topic="${escapeAttr(t.id)}" type="button"
+                  class="py-2 px-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold flex items-center justify-center gap-1 transition">
+                  <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                  <span>Test</span>
+                </button>
+              </div>
+            ` : `
+              <div class="py-2 px-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center text-[11px] font-semibold text-slate-400">
+                Chủ đề sẵn sàng • Đang chờ nạp từ
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
     function renderHome() {
       const totalWords = VOCAB.length || 1;
       const totalLearned = state.learned.size;
@@ -835,76 +1105,75 @@
           )
         : [];
 
-      const topicCardsHtml = TOPICS.map(t => {
-        const prog = getTopicProgress(t.id);
-        const words = getWordsByTopic(t.id);
-        const thumbs = words.slice(0, 3).map(w =>
-          `<div class="aspect-[4/3] rounded-xl bg-white border border-slate-100 overflow-hidden p-1.5 flex items-center justify-center">
-            ${renderWordVisual(w, 'w-7 h-7')}
-          </div>`
-        ).join('');
+      const recentItems = getRecentTopics(4);
+      const favTopicCount = TOPICS.filter(t => getTopicState(t.id).isFavorite).length;
+      const readyTopicCount = TOPICS.filter(t => getWordsByTopic(t.id).length > 0).length;
 
-        return `
-          <div class="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs card-hover flex flex-col justify-between">
-            <div>
-              <div class="flex items-start justify-between gap-3 mb-3">
-                <div class="flex items-center gap-3">
-                  <div class="w-11 h-11 rounded-2xl ${t.accentBg} ${t.accentText} border ${t.accentBorder} flex items-center justify-center shrink-0">
-                    <i data-lucide="${t.icon}" class="w-6 h-6"></i>
-                  </div>
-                  <div>
-                    <div class="flex items-center gap-2">
-                      <h2 class="text-lg font-extrabold text-slate-900">${escapeHtml(t.name)}</h2>
-                      <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${t.accentBg} ${t.accentText}">${words.length} từ</span>
-                    </div>
-                    <p class="text-xs font-medium text-slate-500">${escapeHtml(t.viName)}</p>
-                  </div>
-                </div>
-                <span class="text-xs font-bold ${t.accentText}">${prog.pct}%</span>
-              </div>
+      // Filter 100 topics cleanly
+      const tq = state.topicSearch.trim().toLowerCase();
+      const filteredTopics = TOPICS.filter(t => {
+        const ts = getTopicState(t.id);
+        if (state.topicTab === 'fav' && !ts.isFavorite) return false;
+        if (state.topicTab === 'recent' && !ts.lastStudiedAt) return false;
+        if (state.topicTab === 'ready' && getWordsByTopic(t.id).length === 0) return false;
+        if (state.topicGroup !== 'all') {
+          const grp = TOPIC_GROUPS.find(g => g.id === state.topicGroup);
+          if (grp && (t.sortOrder < grp.min || t.sortOrder > grp.max)) return false;
+        }
+        if (tq) {
+          const hit = t.name.toLowerCase().includes(tq) ||
+            t.viName.toLowerCase().includes(tq) ||
+            t.description.toLowerCase().includes(tq);
+          if (!hit) return false;
+        }
+        return true;
+      });
 
-              <p class="text-sm text-slate-600 mb-4">${escapeHtml(t.description)}</p>
+      // Trigger real-life Wikimedia photo hydration after DOM renders (first 24 visible cards to stay fast)
+      setTimeout(() => hydrateTopicPhotos(filteredTopics.slice(0, 24)), 30);
 
-              <div class="grid grid-cols-3 gap-2 mb-4 bg-slate-50 p-2 rounded-2xl border border-slate-100">
-                ${thumbs || '<div class="col-span-3 text-center text-xs text-slate-400 py-4">Chưa có từ nào trong chủ đề này</div>'}
-              </div>
-
-              <div class="mb-4">
-                <div class="flex justify-between text-xs text-slate-500 mb-1.5">
-                  <span>Tiến độ đã thuộc</span>
-                  <span class="font-semibold text-slate-700">${prog.done}/${prog.total} từ</span>
-                </div>
-                <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div class="${t.barBg} h-full rounded-full transition-all duration-300" style="width: ${prog.pct}%"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-3 gap-2 pt-1">
-              <button data-action="open-topic-learn" data-topic="${escapeAttr(t.id)}" type="button"
-                class="py-2.5 px-2 rounded-xl ${t.badgeBg} hover:opacity-95 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition">
-                <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
-                <span>Học từ</span>
-              </button>
-              <button data-action="open-topic-flashcard" data-topic="${escapeAttr(t.id)}" type="button"
-                class="py-2.5 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 transition">
-                <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-                <span>Flashcard</span>
-              </button>
-              <button data-action="open-topic-quiz" data-topic="${escapeAttr(t.id)}" type="button"
-                class="py-2.5 px-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 transition">
-                <i data-lucide="zap" class="w-3.5 h-3.5"></i>
-                <span>Kiểm tra</span>
-              </button>
-            </div>
+      const recentSectionHtml = recentItems.length ? `
+        <div>
+          <div class="flex items-center justify-between mb-2.5">
+            <h2 class="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+              <i data-lucide="history" class="w-4 h-4 text-emerald-600"></i>
+              <span>Tiếp tục học gần đây</span>
+            </h2>
           </div>
-        `;
-      }).join('');
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            ${recentItems.map(({ topic: t, st }) => {
+              const prog = getTopicProgress(t.id);
+              const lw = st.lastWordId ? VOCAB.find(w => w.id === st.lastWordId) : null;
+              return `
+                <div class="bg-white rounded-2xl border border-emerald-200/80 p-3.5 shadow-2xs flex flex-col justify-between gap-2.5">
+                  <div>
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="font-extrabold text-sm text-slate-900 truncate">${escapeHtml(t.name)}</span>
+                      <span class="text-[11px] font-bold ${t.accentText} shrink-0">${prog.done}/${prog.total}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-0.5 truncate">
+                      ${lw ? `Đang dừng ở: <strong class="text-slate-800">${escapeHtml(lw.word)}</strong>` : escapeHtml(t.viName)}
+                    </p>
+                    <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mt-2">
+                      <div class="${t.barBg} h-full rounded-full" style="width: ${prog.pct}%"></div>
+                    </div>
+                  </div>
+                  <button data-action="resume-topic" data-topic="${escapeAttr(t.id)}" type="button"
+                    class="w-full py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                    <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                    <span>Học tiếp</span>
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : '';
 
       const searchResultsHtml = q ? `
         <div class="mt-3 bg-white rounded-2xl border border-slate-200 p-3 shadow-sm">
           <div class="flex items-center justify-between mb-2 px-1">
-            <span class="text-xs font-bold text-slate-500">Kết quả tìm kiếm (${searchMatches.length})</span>
+            <span class="text-xs font-bold text-slate-500">Kết quả tìm từ (${searchMatches.length})</span>
             <button id="btn-clear-search" type="button" class="text-xs font-semibold text-emerald-600 hover:underline">Xóa lọc</button>
           </div>
           ${searchMatches.length ? `
@@ -935,10 +1204,10 @@
               <div>
                 <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-xs font-semibold mb-2">
                   <i data-lucide="database" class="w-3.5 h-3.5"></i>
-                  <span>${state.dbOnline ? 'Đang kết nối dữ liệu Supabase' : 'Chế độ dữ liệu cục bộ'} • ${VOCAB.length} từ vựng</span>
+                  <span>${TOPICS.length} chủ đề • ${VOCAB.length} từ vựng sẵn sàng</span>
                 </div>
                 <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Học từ vựng trực quan</h1>
-                <p class="text-emerald-50 text-sm mt-1">Ưu tiên giọng đọc chuẩn tự nhiên US/UK, dữ liệu tách biệt hoàn toàn với giao diện.</p>
+                <p class="text-emerald-50 text-sm mt-1">Ảnh đời thật sống động, phát âm chuẩn US/UK, lưu tiến độ tự động theo từng chủ đề.</p>
               </div>
               <div class="grid grid-cols-3 gap-2.5 sm:min-w-[260px]">
                 <div class="bg-white/15 backdrop-blur-xs rounded-2xl p-3 text-center">
@@ -946,8 +1215,8 @@
                   <div class="text-[11px] text-emerald-100 font-medium">Đã thuộc</div>
                 </div>
                 <div class="bg-white/15 backdrop-blur-xs rounded-2xl p-3 text-center">
-                  <div class="text-xl font-extrabold">${state.favorites.size}</div>
-                  <div class="text-[11px] text-emerald-100 font-medium">Yêu thích</div>
+                  <div class="text-xl font-extrabold">${favTopicCount}</div>
+                  <div class="text-[11px] text-emerald-100 font-medium">Chủ đề thích</div>
                 </div>
                 <div class="bg-white/15 backdrop-blur-xs rounded-2xl p-3 text-center">
                   <div class="text-xl font-extrabold">${state.bestQuizScore}%</div>
@@ -966,26 +1235,29 @@
             </div>
           </div>
 
-          <!-- Quick Search Bar -->
+          <!-- Continue Learning Recent Strip -->
+          ${recentSectionHtml}
+
+          <!-- Quick Vocabulary Search Bar -->
           <div>
             <div class="relative">
               <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"></i>
               <input id="home-search-input" type="text" value="${escapeHtml(state.searchQuery)}"
-                placeholder="Tra nhanh từ tiếng Anh hoặc nghĩa tiếng Việt (VD: scholarship, xin lỗi)..."
+                placeholder="Tra nhanh từ vựng (VD: scholarship, xin lỗi)..."
                 class="w-full pl-11 pr-4 py-3 rounded-2xl bg-white border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 shadow-2xs" />
             </div>
             ${searchResultsHtml}
           </div>
 
-          <!-- Topic Cards -->
-          <div>
-            <div class="flex items-center justify-between mb-3">
-              <h2 class="text-base font-extrabold text-slate-900">Chọn chủ đề học</h2>
+          <!-- 100-Topic Directory + Filter Bar -->
+          <div class="space-y-3.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h2 class="text-base font-extrabold text-slate-900">Danh sách chủ đề (${filteredTopics.length}/${TOPICS.length})</h2>
               <div class="flex items-center gap-3">
                 <button data-action="reload-db" type="button"
                   class="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1">
                   <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                  <span>Tải lại dữ liệu</span>
+                  <span>Tải lại</span>
                 </button>
                 <button data-action="open-topic-quiz" data-topic="all" type="button"
                   class="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1">
@@ -994,9 +1266,54 @@
                 </button>
               </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-              ${topicCardsHtml}
+
+            <!-- Filter Bar: Status Tabs + 10-Group Selector + Topic Search -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-3 flex flex-col lg:flex-row lg:items-center gap-2.5 shadow-2xs">
+              <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                ${[
+                  { id: 'all', label: `Tất cả (${TOPICS.length})` },
+                  { id: 'ready', label: `Có từ (${readyTopicCount})` },
+                  { id: 'fav', label: `Yêu thích (${favTopicCount})` },
+                  { id: 'recent', label: `Đang học (${recentItems.length})` }
+                ].map(tab => `
+                  <button data-action="set-topic-tab" data-tab="${tab.id}" type="button"
+                    class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                      state.topicTab === tab.id
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }">${tab.label}</button>
+                `).join('')}
+              </div>
+
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 lg:ml-auto">
+                ${TOPICS.length > 10 ? `
+                  <select id="topic-group-select" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 focus:outline-none focus:border-emerald-500">
+                    <option value="all" ${state.topicGroup === 'all' ? 'selected' : ''}>Tất cả 10 nhóm chủ đề</option>
+                    ${TOPIC_GROUPS.map(g => `<option value="${g.id}" ${state.topicGroup === g.id ? 'selected' : ''}>${g.label}</option>`).join('')}
+                  </select>
+                ` : ''}
+                <div class="relative">
+                  <i data-lucide="filter" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                  <input id="topic-search-input" type="text" value="${escapeHtml(state.topicSearch)}"
+                    placeholder="Lọc tên chủ đề..."
+                    class="w-full sm:w-44 pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:outline-none focus:bg-white focus:border-emerald-500" />
+                </div>
+              </div>
             </div>
+
+            <!-- Responsive 3-column Topic Grid -->
+            ${filteredTopics.length ? `
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${filteredTopics.map(renderTopicCard).join('')}
+              </div>
+            ` : `
+              <div class="bg-white rounded-3xl border border-slate-200 p-10 text-center">
+                <p class="text-sm font-bold text-slate-700">Không có chủ đề nào khớp bộ lọc hiện tại.</p>
+                <button data-action="reset-topic-filters" type="button" class="mt-3 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition">
+                  Hiện lại tất cả chủ đề
+                </button>
+              </div>
+            `}
           </div>
         </section>
       `;
@@ -1004,6 +1321,40 @@
 
     // ==================== LEARN VIEW ====================
     function renderLearn(onlyFavorites = false) {
+      if (onlyFavorites && state.favSubTab === 'topics') {
+        const favTopics = TOPICS.filter(t => getTopicState(t.id).isFavorite);
+        setTimeout(() => hydrateTopicPhotos(favTopics), 30);
+        return `
+          <section class="space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900">Mục yêu thích</h1>
+                <p class="text-sm text-slate-500 mt-0.5">Quản lý nhanh các từ vựng và chủ đề bạn đã ghim yêu thích.</p>
+              </div>
+              <div class="inline-flex bg-white border border-slate-200 p-1 rounded-xl self-start">
+                <button data-action="set-fav-subtab" data-subtab="words" type="button" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">Từ yêu thích (${state.favorites.size})</button>
+                <button data-action="set-fav-subtab" data-subtab="topics" type="button" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white shadow-2xs">Chủ đề yêu thích (${favTopics.length})</button>
+              </div>
+            </div>
+            ${favTopics.length ? `
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${favTopics.map(renderTopicCard).join('')}
+              </div>
+            ` : `
+              <div class="bg-white rounded-3xl border border-slate-200 p-10 text-center">
+                <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-3">
+                  <i data-lucide="star" class="w-6 h-6"></i>
+                </div>
+                <h3 class="font-bold text-slate-900">Chưa có chủ đề yêu thích</h3>
+                <p class="text-sm text-slate-500 mt-1">Bấm biểu tượng ngôi sao ở góc trên bất kỳ thẻ chủ đề nào để ghim vào đây.</p>
+                <button data-nav="home" type="button" class="mt-4 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition">
+                  Xem danh sách chủ đề
+                </button>
+              </div>
+            `}
+          </section>
+        `;
+      }
       let words = onlyFavorites
         ? VOCAB.filter(w => state.favorites.has(w.id))
         : getWordsByTopic(state.topicFilter);
@@ -1015,7 +1366,7 @@
 
       const filterPills = onlyFavorites ? '' : `
         <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-          ${TOPICS.map(t => {
+          ${TOPICS.filter(t => getWordsByTopic(t.id).length > 0).map(t => {
             const active = state.topicFilter === t.id;
             const count = getWordsByTopic(t.id).length;
             return `
@@ -1048,7 +1399,7 @@
             const topicObj = getTopicObj(w.topic);
             const ipa = state.accent === 'UK' ? w.ipaUK : w.ipaUS;
             return `
-              <article class="bg-white rounded-2xl border ${isDone ? 'border-emerald-300 ring-1 ring-emerald-100' : 'border-slate-200'} overflow-hidden shadow-2xs card-hover flex flex-col">
+              <article id="word-card-${escapeAttr(w.id)}" class="bg-white rounded-2xl border ${state.highlightWordId === w.id ? 'border-emerald-500 ring-2 ring-emerald-400 shadow-md' : (isDone ? 'border-emerald-300 ring-1 ring-emerald-100' : 'border-slate-200')} overflow-hidden shadow-2xs card-hover flex flex-col">
                 <div class="relative aspect-[4/3] bg-white p-3 flex items-center justify-center border-b border-slate-100 cursor-pointer" data-action="open-modal" data-id="${escapeAttr(w.id)}">
                   ${renderWordVisual(w, 'w-12 h-12')}
                   <span class="absolute top-2.5 left-2.5 text-[10px] font-bold px-2 py-0.5 rounded-md ${topicObj.accentBg} ${topicObj.accentText}">${escapeHtml(topicObj.name)}</span>
@@ -1113,12 +1464,20 @@
               <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900">${headerTitle}</h1>
               <p class="text-sm text-slate-500 mt-0.5">${headerSub}</p>
             </div>
-            ${onlyFavorites && words.length ? `
-              <button data-action="fc-favorites" type="button"
-                class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 self-start sm:self-auto transition">
-                <i data-lucide="layers" class="w-4 h-4"></i>
-                <span>Ôn Flashcard mục yêu thích</span>
-              </button>
+            ${onlyFavorites ? `
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="inline-flex bg-white border border-slate-200 p-1 rounded-xl">
+                  <button data-action="set-fav-subtab" data-subtab="words" type="button" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white shadow-2xs">Từ yêu thích (${state.favorites.size})</button>
+                  <button data-action="set-fav-subtab" data-subtab="topics" type="button" class="px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900">Chủ đề yêu thích (${TOPICS.filter(t => getTopicState(t.id).isFavorite).length})</button>
+                </div>
+                ${words.length ? `
+                  <button data-action="fc-favorites" type="button"
+                    class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition">
+                    <i data-lucide="layers" class="w-4 h-4"></i>
+                    <span>Ôn Flashcard</span>
+                  </button>
+                ` : ''}
+              </div>
             ` : `
               <div class="flex items-center gap-2">
                 <button data-action="open-topic-flashcard" data-topic="${escapeAttr(state.topicFilter)}" type="button"
@@ -2091,6 +2450,7 @@
                   state.authBusy = false;
                   closeAuthModal();
                   await loadUserProgressFromCloud();
+          await loadTopicStatesFromCloud();
                   await loadUserProfileFromCloud(true);
                   showToast('Đăng nhập thành công!');
                   render();
@@ -2109,6 +2469,7 @@
                   state.authBusy = false;
                   closeAuthModal();
                   await loadUserProgressFromCloud();
+          await loadTopicStatesFromCloud();
                   await loadUserProfileFromCloud(true);
                   showToast('Tạo tài khoản và đăng nhập thành công!');
                   render();
@@ -2203,6 +2564,23 @@
           render();
         });
       }
+      const grpSel = document.getElementById('topic-group-select');
+      if (grpSel) {
+        grpSel.addEventListener('change', (e) => {
+          state.topicGroup = e.target.value;
+          render();
+        });
+      }
+      const topicSearchEl = document.getElementById('topic-search-input');
+      if (topicSearchEl) {
+        topicSearchEl.addEventListener('input', (e) => {
+          state.topicSearch = e.target.value;
+          const cursor = e.target.selectionStart;
+          render();
+          const ni = document.getElementById('topic-search-input');
+          if (ni) { ni.focus(); ni.setSelectionRange(cursor, cursor); }
+        });
+      }
     }
 
     // Event Delegation
@@ -2234,7 +2612,10 @@
       if (action === 'speak-vocab') {
         e.stopPropagation();
         const w = VOCAB.find(x => x.id === actEl.dataset.id);
-        if (w) speakText(w.word, state.accent, state.speechRate, w);
+        if (w) {
+          recordTopicStudy(w.topic, w.id, state.view === 'flashcard' ? 'flashcard' : 'learn');
+          speakText(w.word, state.accent, state.speechRate, w);
+        }
         return;
       }
       if (action === 'speak-slow') {
@@ -2304,16 +2685,77 @@
         return;
       }
       if (action === 'toggle-fav') { e.stopPropagation(); toggleFavorite(actEl.dataset.id); return; }
-      if (action === 'toggle-learned') { e.stopPropagation(); toggleLearned(actEl.dataset.id); return; }
+      if (action === 'toggle-learned') {
+        e.stopPropagation();
+        const w = VOCAB.find(x => x.id === actEl.dataset.id);
+        if (w) recordTopicStudy(w.topic, w.id, 'learn');
+        toggleLearned(actEl.dataset.id);
+        return;
+      }
+      if (action === 'toggle-fav-topic') {
+        e.stopPropagation();
+        toggleFavoriteTopic(actEl.dataset.topic);
+        return;
+      }
+      if (action === 'set-topic-tab') {
+        state.topicTab = actEl.dataset.tab;
+        render();
+        return;
+      }
+      if (action === 'reset-topic-filters') {
+        state.topicTab = 'all';
+        state.topicGroup = 'all';
+        state.topicSearch = '';
+        render();
+        return;
+      }
+      if (action === 'set-fav-subtab') {
+        state.favSubTab = actEl.dataset.subtab;
+        render();
+        return;
+      }
+      if (action === 'resume-topic') {
+        const tid = actEl.dataset.topic;
+        const ts = getTopicState(tid);
+        if (ts.lastMode === 'flashcard') {
+          setView('flashcard', { topic: tid, fcFilter: 'all' });
+          if (ts.lastWordId) {
+            const idx = state.fcDeck.findIndex(x => x.id === ts.lastWordId);
+            if (idx >= 0) { state.fcIndex = idx; render(); }
+          }
+        } else {
+          state.highlightWordId = ts.lastWordId || null;
+          setView('learn', { topic: tid });
+          if (ts.lastWordId) {
+            setTimeout(() => {
+              const cardEl = document.getElementById('word-card-' + ts.lastWordId);
+              if (cardEl) cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 120);
+          }
+        }
+        return;
+      }
       if (action === 'open-modal') {
         renderModal(actEl.dataset.id);
         const w = VOCAB.find(x => x.id === actEl.dataset.id);
-        if (w) speakText(w.word, state.accent, state.speechRate, w);
+        if (w) {
+          recordTopicStudy(w.topic, w.id, 'learn');
+          speakText(w.word, state.accent, state.speechRate, w);
+        }
         return;
       }
       if (action === 'close-modal') { closeModal(); return; }
-      if (action === 'open-topic-learn') { setView('learn', { topic: actEl.dataset.topic }); return; }
-      if (action === 'open-topic-flashcard') { setView('flashcard', { topic: actEl.dataset.topic, fcFilter: 'all' }); return; }
+      if (action === 'open-topic-learn') {
+        state.highlightWordId = null;
+        recordTopicStudy(actEl.dataset.topic, '', 'learn');
+        setView('learn', { topic: actEl.dataset.topic });
+        return;
+      }
+      if (action === 'open-topic-flashcard') {
+        recordTopicStudy(actEl.dataset.topic, '', 'flashcard');
+        setView('flashcard', { topic: actEl.dataset.topic, fcFilter: 'all' });
+        return;
+      }
       if (action === 'open-topic-quiz') { setView('quiz', { quizTopic: actEl.dataset.topic, autoStart: false }); return; }
       if (action === 'set-topic-filter') { state.topicFilter = actEl.dataset.topic; render(); return; }
       if (action === 'go-learn') { setView('learn', { topic: 'all' }); return; }
@@ -2327,6 +2769,7 @@
         const inner = document.getElementById('flashcard-inner');
         if (inner) inner.classList.toggle('rotate-y-180', state.fcFlipped);
         const cur = state.fcDeck[state.fcIndex];
+        if (cur) recordTopicStudy(cur.topic, cur.id, 'flashcard');
         if (state.fcFlipped && cur) speakText(cur.word, state.accent, state.speechRate, cur);
         return;
       }
