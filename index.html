@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PicVoc Web — Học Từ Vựng Tiếng Anh Qua Hình Ảnh</title>
+  <title>KaDoc — Học Từ Vựng Tiếng Anh Qua Hình Ảnh</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -49,6 +50,11 @@
       100% { opacity: 1; transform: scale(1) translateY(0); }
     }
     .animate-pop { animation: popIn 0.22s ease-out forwards; }
+    @keyframes bubbleIn {
+      0% { opacity: 0; transform: translateY(8px) scale(0.94); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .animate-bubble { animation: bubbleIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -62,7 +68,7 @@
         </div>
         <div>
           <div class="flex items-center gap-1.5">
-            <span class="font-extrabold text-lg tracking-tight text-slate-900">PicVoc</span>
+            <span class="font-extrabold text-lg tracking-tight text-slate-900">KaDoc</span>
             <span id="db-status-badge" class="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-700">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
               <span>Cloud</span>
@@ -158,6 +164,32 @@
   <!-- Auth Modal -->
   <div id="auth-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/55 backdrop-blur-xs p-3 sm:p-5">
     <div id="auth-modal-card" class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 animate-pop border border-slate-200 space-y-4"></div>
+  </div>
+
+  <!-- Onboarding Modal (Nickname + 12 Zodiac 3D Mascot + Daily Goal) -->
+  <div id="onboarding-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/55 backdrop-blur-xs p-3 sm:p-5">
+    <div id="onboarding-modal-card" class="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 animate-pop border border-slate-200 space-y-4"></div>
+  </div>
+
+  <!-- Floating 3D Chibi Mascot Widget (Bottom-Right, Compact & Extensible) -->
+  <div id="mascot-widget" class="fixed bottom-16 md:bottom-5 right-3 sm:right-5 z-40 flex flex-col items-end pointer-events-none select-none">
+    <!-- Modern Glass Speech Bubble -->
+    <div id="mascot-bubble" class="hidden pointer-events-auto mb-1.5 mr-1 max-w-[235px] sm:max-w-[265px] bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-lg rounded-2xl rounded-br-sm px-3.5 py-2.5 animate-bubble">
+      <div class="flex items-start justify-between gap-2">
+        <div id="mascot-bubble-content" class="text-xs sm:text-[13px] text-slate-700 leading-snug"></div>
+        <button id="btn-mascot-close-bubble" type="button" aria-label="Đóng lời chào"
+          class="text-slate-400 hover:text-slate-700 p-0.5 -mr-1 -mt-0.5 rounded-md transition shrink-0">
+          <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+      <div id="mascot-bubble-actions" class="hidden mt-2 pt-2 border-t border-slate-100 flex items-center gap-2"></div>
+    </div>
+    <!-- 3D Chibi Canvas Container -->
+    <button id="btn-mascot-avatar" type="button" title="Chạm vào linh vật để trò chuyện"
+      class="pointer-events-auto relative w-[92px] h-[92px] sm:w-[104px] sm:h-[104px] rounded-full focus:outline-none group transition-transform hover:scale-105 active:scale-95">
+      <div class="absolute inset-2 rounded-full bg-gradient-to-tr from-emerald-100/80 via-white/90 to-teal-50/80 border border-white shadow-md group-hover:shadow-lg transition"></div>
+      <canvas id="mascot-canvas" class="relative z-10 w-full h-full block"></canvas>
+    </button>
   </div>
 
   <!-- Toast Notification -->
@@ -310,7 +342,8 @@
           bestQuizScore: state.bestQuizScore,
           preferredUSVoice: state.preferredUSVoice,
           preferredUKVoice: state.preferredUKVoice,
-          useRealDictAudio: state.useRealDictAudio
+          useRealDictAudio: state.useRealDictAudio,
+          profile: state.profile
         }));
       } catch (e) {}
     }
@@ -335,6 +368,16 @@
       preferredUSVoice: saved.preferredUSVoice || '',
       preferredUKVoice: saved.preferredUKVoice || '',
       bestQuizScore: typeof saved.bestQuizScore === 'number' ? saved.bestQuizScore : 0,
+      profile: {
+        nickname: (saved.profile && saved.profile.nickname) || '',
+        mascot: (saved.profile && saved.profile.mascot) || 'cat',
+        dailyGoal: (saved.profile && saved.profile.dailyGoal) || 10,
+        onboarded: Boolean(saved.profile && saved.profile.onboarded)
+      },
+      obDraftNickname: '',
+      obDraftMascot: 'cat',
+      obDraftGoal: 10,
+      hasGreetedSession: false,
       modalWordId: null,
       fcDeck: [],
       fcIndex: 0,
@@ -622,11 +665,17 @@
         if (data && data.session && data.session.user) {
           state.user = data.session.user;
           await loadUserProgressFromCloud();
+          await loadUserProfileFromCloud(true);
+        } else {
+          // Guest welcome greeting once per page load
+          setTimeout(() => { if (!state.hasGreetedSession) triggerMascotGreeting(); }, 900);
         }
-        supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+          const prevUid = state.user ? state.user.id : null;
           state.user = session ? session.user : null;
-          if (state.user) {
+          if (state.user && (event === 'SIGNED_IN' || state.user.id !== prevUid)) {
             await loadUserProgressFromCloud();
+            await loadUserProfileFromCloud(true);
           }
           render();
         });
@@ -1932,6 +1981,12 @@
             </div>
           </div>
 
+          <button data-action="open-onboarding" type="button"
+            class="w-full py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center gap-2 border border-emerald-200 transition">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span>Đổi biệt danh &amp; linh vật 3D (${escapeHtml(getMascotMeta(state.profile.mascot).name)})</span>
+          </button>
+
           <button data-action="do-logout" type="button"
             class="w-full py-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-sm flex items-center justify-center gap-2 transition">
             <i data-lucide="log-out" class="w-4 h-4"></i>
@@ -1943,7 +1998,7 @@
         card.innerHTML = `
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="text-lg font-extrabold text-slate-900">${isLogin ? 'Đăng nhập PicVoc' : 'Tạo tài khoản mới'}</h3>
+              <h3 class="text-lg font-extrabold text-slate-900">${isLogin ? 'Đăng nhập KaDoc' : 'Tạo tài khoản mới'}</h3>
               <p class="text-xs text-slate-500 mt-0.5">Đồng bộ từ đã thuộc &amp; yêu thích lên Supabase</p>
             </div>
             <button data-action="close-auth-modal" type="button" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">
@@ -2036,6 +2091,7 @@
                   state.authBusy = false;
                   closeAuthModal();
                   await loadUserProgressFromCloud();
+                  await loadUserProfileFromCloud(true);
                   showToast('Đăng nhập thành công!');
                   render();
                   return;
@@ -2053,6 +2109,7 @@
                   state.authBusy = false;
                   closeAuthModal();
                   await loadUserProgressFromCloud();
+                  await loadUserProfileFromCloud(true);
                   showToast('Tạo tài khoản và đăng nhập thành công!');
                   render();
                   return;
@@ -2448,12 +2505,626 @@
       }
     });
 
+
+    // =========================================================
+    // 5. 12-ZODIAC 3D CHIBI MASCOT + ONBOARDING + NOTIFICATION HOOK
+    // =========================================================
+    const ZODIAC_MASCOTS = [
+      { id: 'rat',     name: 'Tý (Chuột)',   short: 'Tý',   color: '#94a3b8', accent: '#fda4af', belly: '#f8fafc', hex: 0x94a3b8, accentHex: 0xfda4af, bellyHex: 0xf8fafc },
+      { id: 'ox',      name: 'Sửu (Trâu)',   short: 'Sửu',  color: '#8d6e63', accent: '#fcd34d', belly: '#fef3c7', hex: 0x8d6e63, accentHex: 0xfcd34d, bellyHex: 0xfef3c7 },
+      { id: 'tiger',   name: 'Dần (Hổ)',     short: 'Dần',  color: '#fb923c', accent: '#7c2d12', belly: '#fff7ed', hex: 0xfb923c, accentHex: 0x7c2d12, bellyHex: 0xfff7ed },
+      { id: 'cat',     name: 'Mão (Mèo)',    short: 'Mão',  color: '#fdba74', accent: '#fb7185', belly: '#fffbeb', hex: 0xfdba74, accentHex: 0xfb7185, bellyHex: 0xfffbeb },
+      { id: 'dragon',  name: 'Thìn (Rồng)',  short: 'Thìn', color: '#10b981', accent: '#f59e0b', belly: '#ecfdf5', hex: 0x10b981, accentHex: 0xf59e0b, bellyHex: 0xecfdf5 },
+      { id: 'snake',   name: 'Tỵ (Rắn)',     short: 'Tỵ',   color: '#34d399', accent: '#fbbf24', belly: '#d1fae5', hex: 0x34d399, accentHex: 0xfbbf24, bellyHex: 0xd1fae5 },
+      { id: 'horse',   name: 'Ngọ (Ngựa)',   short: 'Ngọ',  color: '#b45309', accent: '#78350f', belly: '#fef3c7', hex: 0xb45309, accentHex: 0x78350f, bellyHex: 0xfef3c7 },
+      { id: 'goat',    name: 'Mùi (Dê)',     short: 'Mùi',  color: '#e2e8f0', accent: '#f59e0b', belly: '#ffffff', hex: 0xf1f5f9, accentHex: 0xf59e0b, bellyHex: 0xffffff },
+      { id: 'monkey',  name: 'Thân (Khỉ)',   short: 'Thân', color: '#a16207', accent: '#fed7aa', belly: '#ffedd5', hex: 0xa16207, accentHex: 0xfed7aa, bellyHex: 0xffedd5 },
+      { id: 'rooster', name: 'Dậu (Gà)',     short: 'Dậu',  color: '#fde047', accent: '#ef4444', belly: '#fefce8', hex: 0xfde047, accentHex: 0xef4444, bellyHex: 0xfefce8 },
+      { id: 'dog',     name: 'Tuất (Chó)',   short: 'Tuất', color: '#f59e0b', accent: '#ef4444', belly: '#fffbeb', hex: 0xf59e0b, accentHex: 0xef4444, bellyHex: 0xfffbeb },
+      { id: 'pig',     name: 'Hợi (Lợn)',    short: 'Hợi',  color: '#f9a8d4', accent: '#f472b6', belly: '#fdf2f8', hex: 0xf9a8d4, accentHex: 0xf472b6, bellyHex: 0xfdf2f8 }
+    ];
+
+    function getMascotMeta(id) {
+      return ZODIAC_MASCOTS.find(m => m.id === id) || ZODIAC_MASCOTS[3];
+    }
+
+    function getDisplayNickname() {
+      const nick = (state.profile && state.profile.nickname || '').trim();
+      return nick || 'bạn';
+    }
+
+    // Load / Save user profile (nickname + mascot + daily_goal) in Supabase user_profiles table
+    async function loadUserProfileFromCloud(greetAfter) {
+      if (!supabaseClient || !state.user) return;
+      let foundCloud = false;
+      try {
+        const { data, error } = await supabaseClient
+          .from('user_profiles')
+          .select('nickname, mascot, daily_goal, onboarded')
+          .eq('user_id', state.user.id)
+          .maybeSingle();
+        if (!error && data) {
+          state.profile = {
+            nickname: data.nickname || '',
+            mascot: data.mascot || 'cat',
+            dailyGoal: data.daily_goal || 10,
+            onboarded: Boolean(data.onboarded)
+          };
+          saveState();
+          foundCloud = true;
+        }
+      } catch (e) {}
+
+      // Fallback to Supabase auth user_metadata if user_profiles table not created yet
+      if (!foundCloud && state.user.user_metadata && state.user.user_metadata.picvoc_onboarded) {
+        state.profile = {
+          nickname: state.user.user_metadata.picvoc_nickname || '',
+          mascot: state.user.user_metadata.picvoc_mascot || 'cat',
+          dailyGoal: state.user.user_metadata.picvoc_daily_goal || 10,
+          onboarded: true
+        };
+        saveState();
+        foundCloud = true;
+      }
+
+      updateFloatingMascotModel();
+      if (!state.profile.onboarded) {
+        openOnboardingModal();
+      } else if (greetAfter && !state.hasGreetedSession) {
+        setTimeout(() => triggerMascotGreeting(), 500);
+      }
+    }
+
+    async function saveUserProfileToCloud() {
+      saveState();
+      updateFloatingMascotModel();
+      if (!supabaseClient || !state.user) return;
+      try {
+        await supabaseClient.from('user_profiles').upsert({
+          user_id: state.user.id,
+          nickname: state.profile.nickname,
+          mascot: state.profile.mascot,
+          daily_goal: state.profile.dailyGoal,
+          onboarded: true,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+      } catch (e) {}
+      try {
+        await supabaseClient.auth.updateUser({
+          data: {
+            picvoc_nickname: state.profile.nickname,
+            picvoc_mascot: state.profile.mascot,
+            picvoc_daily_goal: state.profile.dailyGoal,
+            picvoc_onboarded: true
+          }
+        });
+      } catch (e) {}
+    }
+
+    // ---- Three.js Procedural Chibi 3D Zodiac Builder ----
+    function buildChibiZodiacMesh(mascotId) {
+      const m = getMascotMeta(mascotId);
+      const group = new THREE.Group();
+
+      const bodyMat = new THREE.MeshStandardMaterial({ color: m.hex, roughness: 0.38, metalness: 0.05 });
+      const bellyMat = new THREE.MeshStandardMaterial({ color: m.bellyHex, roughness: 0.45, metalness: 0.02 });
+      const accentMat = new THREE.MeshStandardMaterial({ color: m.accentHex, roughness: 0.35, metalness: 0.08 });
+      const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.15, metalness: 0.1 });
+      const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const cheekMat = new THREE.MeshBasicMaterial({ color: 0xfda4af, transparent: true, opacity: 0.65 });
+
+      // Chubby body
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.68, 28, 24), bodyMat);
+      body.scale.set(1.0, 0.92, 0.92);
+      body.position.y = -0.58;
+      group.add(body);
+
+      // Cute belly patch
+      const belly = new THREE.Mesh(new THREE.SphereGeometry(0.48, 24, 20), bellyMat);
+      belly.scale.set(0.92, 0.88, 0.55);
+      belly.position.set(0, -0.60, 0.42);
+      group.add(belly);
+
+      // Little paws
+      [-0.48, 0.48].forEach(x => {
+        const arm = new THREE.Mesh(new THREE.SphereGeometry(0.20, 18, 16), bodyMat);
+        arm.scale.set(0.85, 1.15, 0.85);
+        arm.position.set(x, -0.48, 0.28);
+        arm.rotation.z = x < 0 ? 0.35 : -0.35;
+        group.add(arm);
+      });
+      [-0.28, 0.28].forEach(x => {
+        const foot = new THREE.Mesh(new THREE.SphereGeometry(0.20, 18, 16), bodyMat);
+        foot.scale.set(1.0, 0.65, 1.2);
+        foot.position.set(x, -1.12, 0.18);
+        group.add(foot);
+      });
+
+      // Head group (for cute playful head tilts)
+      const headGroup = new THREE.Group();
+      headGroup.position.set(0, 0.32, 0);
+      group.add(headGroup);
+
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.86, 32, 28), bodyMat);
+      head.scale.set(1.08, 0.96, 0.98);
+      headGroup.add(head);
+
+      // Eyes + glossy specular catchlights
+      [-0.32, 0.32].forEach(x => {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.115, 18, 16), darkMat);
+        eye.position.set(x, 0.06, 0.77);
+        headGroup.add(eye);
+        const shine = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 12), whiteMat);
+        shine.position.set(x + 0.038, 0.105, 0.86);
+        headGroup.add(shine);
+        // Rosy cheeks
+        const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), cheekMat);
+        cheek.scale.set(1.25, 0.65, 0.35);
+        cheek.position.set(x * 1.55, -0.10, 0.69);
+        headGroup.add(cheek);
+      });
+
+      // Muzzle / Nose depending on zodiac
+      if (mascotId === 'pig') {
+        const snout = new THREE.Mesh(new THREE.SphereGeometry(0.24, 20, 16), accentMat);
+        snout.scale.set(1.25, 0.85, 0.65);
+        snout.position.set(0, -0.08, 0.82);
+        headGroup.add(snout);
+        [-0.08, 0.08].forEach(nx => {
+          const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.038, 10, 10), darkMat);
+          nostril.position.set(nx, -0.08, 0.96);
+          headGroup.add(nostril);
+        });
+      } else if (mascotId === 'rooster') {
+        const beak = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.28, 16), new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.3 }));
+        beak.rotation.x = Math.PI / 2;
+        beak.position.set(0, -0.06, 0.90);
+        headGroup.add(beak);
+      } else {
+        const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.23, 20, 16), bellyMat);
+        muzzle.scale.set(1.2, 0.85, 0.65);
+        muzzle.position.set(0, -0.11, 0.76);
+        headGroup.add(muzzle);
+        const nose = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 12), mascotId === 'rat' ? accentMat : darkMat);
+        nose.scale.set(1.2, 0.85, 0.8);
+        nose.position.set(0, -0.04, 0.91);
+        headGroup.add(nose);
+      }
+
+      // Signature zodiac ears / horns / crests
+      if (mascotId === 'rat' || mascotId === 'monkey') {
+        const earRadius = mascotId === 'rat' ? 0.36 : 0.28;
+        const earY = mascotId === 'rat' ? 0.64 : 0.14;
+        const earX = mascotId === 'rat' ? 0.64 : 0.88;
+        [-earX, earX].forEach(ex => {
+          const ear = new THREE.Mesh(new THREE.SphereGeometry(earRadius, 20, 16), bodyMat);
+          ear.scale.set(1.0, 1.0, 0.42);
+          ear.position.set(ex, earY, 0.05);
+          headGroup.add(ear);
+          const inner = new THREE.Mesh(new THREE.SphereGeometry(earRadius * 0.65, 16, 12), accentMat);
+          inner.scale.set(1.0, 1.0, 0.35);
+          inner.position.set(ex, earY, 0.14);
+          headGroup.add(inner);
+        });
+      } else if (mascotId === 'cat' || mascotId === 'dog' || mascotId === 'horse') {
+        [-0.55, 0.55].forEach(ex => {
+          const ear = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.56, 18), bodyMat);
+          ear.position.set(ex, 0.78, 0.04);
+          ear.rotation.z = ex < 0 ? 0.28 : -0.28;
+          if (mascotId === 'dog') {
+            ear.rotation.z = ex < 0 ? 0.65 : -0.65;
+            ear.position.y = 0.62;
+          }
+          headGroup.add(ear);
+          const inner = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.34, 14), accentMat);
+          inner.position.set(ex, mascotId === 'dog' ? 0.60 : 0.76, 0.12);
+          inner.rotation.z = ear.rotation.z;
+          headGroup.add(inner);
+        });
+        if (mascotId === 'horse') {
+          for (let i = 0; i < 3; i++) {
+            const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.18 - i * 0.02, 14, 12), accentMat);
+            tuft.position.set(0, 0.85 - i * 0.14, 0.22 - i * 0.26);
+            headGroup.add(tuft);
+          }
+        }
+      } else if (mascotId === 'tiger') {
+        [-0.58, 0.58].forEach(ex => {
+          const ear = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 16), bodyMat);
+          ear.position.set(ex, 0.68, 0.05);
+          headGroup.add(ear);
+        });
+        // Forehead tiger stripes
+        [-0.14, 0, 0.14].forEach(sx => {
+          const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.24, 0.08), accentMat);
+          stripe.position.set(sx, 0.54, 0.72);
+          headGroup.add(stripe);
+        });
+      } else if (mascotId === 'ox' || mascotId === 'goat' || mascotId === 'dragon') {
+        // Cute curved horns
+        [-0.42, 0.42].forEach(hx => {
+          const horn = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.52, 16), accentMat);
+          horn.position.set(hx, 0.82, 0.08);
+          horn.rotation.z = hx < 0 ? 0.42 : -0.42;
+          headGroup.add(horn);
+          const ear = new THREE.Mesh(new THREE.SphereGeometry(0.20, 14, 12), bodyMat);
+          ear.scale.set(1.3, 0.7, 0.5);
+          ear.position.set(hx * 1.9, 0.34, 0.02);
+          headGroup.add(ear);
+        });
+        if (mascotId === 'dragon') {
+          for (let i = 0; i < 3; i++) {
+            const spike = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.24, 12), accentMat);
+            spike.position.set(0, 0.84 - i * 0.22, -0.10 - i * 0.32);
+            spike.rotation.x = -0.6;
+            headGroup.add(spike);
+          }
+        }
+        if (mascotId === 'goat') {
+          [-0.18, 0, 0.18].forEach(wx => {
+            const wool = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 14), bellyMat);
+            wool.position.set(wx, 0.80, 0.25);
+            headGroup.add(wool);
+          });
+        }
+      } else if (mascotId === 'rooster') {
+        // Cute red comb on top
+        [-0.16, 0, 0.16].forEach((cx, i) => {
+          const comb = new THREE.Mesh(new THREE.SphereGeometry(i === 1 ? 0.20 : 0.14, 16, 14), accentMat);
+          comb.position.set(cx, 0.88 + (i === 1 ? 0.06 : 0), 0.12);
+          headGroup.add(comb);
+        });
+      } else if (mascotId === 'pig') {
+        [-0.58, 0.58].forEach(ex => {
+          const ear = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.42, 16), bodyMat);
+          ear.position.set(ex, 0.68, 0.14);
+          ear.rotation.z = ex < 0 ? 0.62 : -0.62;
+          ear.rotation.x = 0.28;
+          headGroup.add(ear);
+        });
+      } else if (mascotId === 'snake') {
+        // Cute golden mini crown crest
+        const crown = new THREE.Mesh(new THREE.ConeGeometry(0.20, 0.32, 6), accentMat);
+        crown.position.set(0, 0.90, 0.10);
+        headGroup.add(crown);
+      }
+
+      group.userData.headGroup = headGroup;
+      return group;
+    }
+
+    // ---- 3D Viewport Controller (used for both Floating Widget & Onboarding Preview) ----
+    function createChibiViewer(canvasEl, initialMascotId) {
+      if (!canvasEl || !window.THREE) return null;
+      let renderer;
+      try {
+        renderer = new THREE.WebGLRenderer({ canvas: canvasEl, alpha: true, antialias: true });
+      } catch (e) {
+        return null;
+      }
+      const rect = canvasEl.getBoundingClientRect();
+      const w = Math.max(rect.width || 104, 80);
+      const h = Math.max(rect.height || 104, 80);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(w, h, false);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(36, w / h, 0.1, 50);
+      camera.position.set(0, 0.12, 4.45);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0xcbd5e1, 1.05);
+      scene.add(hemi);
+      const key = new THREE.DirectionalLight(0xffffff, 0.85);
+      key.position.set(2.5, 4.0, 3.5);
+      scene.add(key);
+      const rim = new THREE.DirectionalLight(0xa7f3d0, 0.45);
+      rim.position.set(-2.5, 1.5, -2.5);
+      scene.add(rim);
+
+      let mesh = buildChibiZodiacMesh(initialMascotId);
+      scene.add(mesh);
+
+      let rafId = null;
+      let bounceBoost = 0;
+      const startTime = performance.now();
+
+      function animate(now) {
+        rafId = requestAnimationFrame(animate);
+        const t = (now - startTime) * 0.001;
+        if (bounceBoost > 0.01) bounceBoost *= 0.91;
+        else bounceBoost = 0;
+
+        // Playful idle sway + bobbing ("ngoáy qua ngoáy lại")
+        mesh.position.y = Math.sin(t * 2.6) * 0.08 + Math.sin(bounceBoost * Math.PI) * 0.35;
+        mesh.rotation.y = Math.sin(t * 1.45) * 0.36 + bounceBoost * 1.8;
+        mesh.rotation.z = Math.sin(t * 1.9) * 0.06;
+        if (mesh.userData.headGroup) {
+          mesh.userData.headGroup.rotation.z = Math.sin(t * 2.2) * 0.10;
+          mesh.userData.headGroup.rotation.x = Math.sin(t * 1.7) * 0.06;
+        }
+        renderer.render(scene, camera);
+      }
+      rafId = requestAnimationFrame(animate);
+
+      return {
+        setMascot(newId) {
+          scene.remove(mesh);
+          mesh = buildChibiZodiacMesh(newId);
+          scene.add(mesh);
+          bounceBoost = 1.0;
+        },
+        bounce() {
+          bounceBoost = 1.0;
+        },
+        destroy() {
+          if (rafId) cancelAnimationFrame(rafId);
+          renderer.dispose();
+        }
+      };
+    }
+
+    let floatingMascotViewer = null;
+    let onboardingMascotViewer = null;
+    let bubbleTimer = null;
+
+    function initFloatingMascot() {
+      const canvas = document.getElementById('mascot-canvas');
+      if (!canvas) return;
+      if (floatingMascotViewer) floatingMascotViewer.destroy();
+      floatingMascotViewer = createChibiViewer(canvas, state.profile.mascot);
+    }
+
+    function updateFloatingMascotModel() {
+      if (floatingMascotViewer) {
+        floatingMascotViewer.setMascot(state.profile.mascot);
+      } else {
+        initFloatingMascot();
+      }
+    }
+
+    // Extensible Mascot Messaging API (ready for future scheduled reminders & tips!)
+    window.KaDocMascot = window.PicVocMascot = {
+      say(htmlMessage, opts = {}) {
+        const bubble = document.getElementById('mascot-bubble');
+        const content = document.getElementById('mascot-bubble-content');
+        const actions = document.getElementById('mascot-bubble-actions');
+        if (!bubble || !content) return;
+        content.innerHTML = htmlMessage;
+        if (actions) {
+          if (opts.actionText && typeof opts.onAction === 'function') {
+            actions.innerHTML = '';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition';
+            btn.textContent = opts.actionText;
+            btn.addEventListener('click', () => {
+              window.PicVocMascot.hide();
+              opts.onAction();
+            });
+            actions.appendChild(btn);
+            actions.classList.remove('hidden');
+          } else {
+            actions.classList.add('hidden');
+            actions.innerHTML = '';
+          }
+        }
+        bubble.classList.remove('hidden');
+        if (floatingMascotViewer) floatingMascotViewer.bounce();
+        if (window.lucide) lucide.createIcons();
+        clearTimeout(bubbleTimer);
+        const duration = typeof opts.duration === 'number' ? opts.duration : 6500;
+        if (duration > 0) {
+          bubbleTimer = setTimeout(() => window.PicVocMascot.hide(), duration);
+        }
+      },
+      hide() {
+        const bubble = document.getElementById('mascot-bubble');
+        if (bubble) bubble.classList.add('hidden');
+        clearTimeout(bubbleTimer);
+      },
+      // Placeholder hook for future notification queue
+      notifications: []
+    };
+
+    function triggerMascotGreeting() {
+      state.hasGreetedSession = true;
+      const name = escapeHtml(getDisplayNickname());
+      window.PicVocMascot.say(
+        `<div class="font-extrabold text-slate-900">Hello ${name}!</div><div class="text-slate-500 mt-0.5">Chào mừng ${name} quay lại học từ vựng hôm nay nhé.</div>`,
+        { duration: 6500 }
+      );
+    }
+
+    // ---- Onboarding Modal (Nickname + 12 Zodiac Chibi + Daily Goal) ----
+    function openOnboardingModal() {
+      const modal = document.getElementById('onboarding-modal');
+      const card = document.getElementById('onboarding-modal-card');
+      if (!modal || !card) return;
+      state.obDraftNickname = state.profile.nickname || '';
+      state.obDraftMascot = state.profile.mascot || 'cat';
+      state.obDraftGoal = state.profile.dailyGoal || 10;
+      renderOnboardingModal();
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeOnboardingModal() {
+      const modal = document.getElementById('onboarding-modal');
+      if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+      if (onboardingMascotViewer) {
+        onboardingMascotViewer.destroy();
+        onboardingMascotViewer = null;
+      }
+    }
+
+    function renderOnboardingModal() {
+      const card = document.getElementById('onboarding-modal-card');
+      if (!card) return;
+      const selectedMeta = getMascotMeta(state.obDraftMascot);
+
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 mb-1">
+              <i data-lucide="sparkles" class="w-3 h-3"></i> Thiết lập nhanh không gian học
+            </span>
+            <h3 class="text-xl font-extrabold text-slate-900">Mình có thể gọi bạn là gì?</h3>
+          </div>
+          <button data-action="ob-skip" type="button" class="text-xs font-bold text-slate-400 hover:text-slate-700 px-2 py-1 rounded-lg">
+            Bỏ qua
+          </button>
+        </div>
+
+        <!-- 3D Live Preview + Nickname Input -->
+        <div class="flex flex-col sm:flex-row items-center gap-4 bg-slate-50 rounded-2xl p-4 border border-slate-200/80">
+          <div class="w-28 h-28 rounded-2xl bg-gradient-to-br from-emerald-50 via-white to-teal-50 border border-emerald-100 shadow-inner flex items-center justify-center shrink-0">
+            <canvas id="ob-mascot-canvas" class="w-28 h-28 block"></canvas>
+          </div>
+          <div class="flex-1 w-full space-y-2">
+            <label class="block text-xs font-bold text-slate-600">Biệt danh của bạn là...</label>
+            <input id="ob-nickname-input" type="text" maxlength="24" value="${escapeAttr(state.obDraftNickname)}"
+              placeholder="Ví dụ: Khánh, Ken, Mèo Lười... (bỏ trống sẽ gọi là bạn)"
+              class="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-200 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500" />
+            <p class="text-[11px] text-slate-500">Linh vật <strong class="text-emerald-700">${escapeHtml(selectedMeta.name)}</strong> sẽ đồng hành ở góc màn hình.</p>
+          </div>
+        </div>
+
+        <!-- 12 Zodiac Chibi Selector -->
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Chọn linh vật 12 con giáp 3D</label>
+          <div class="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+            ${ZODIAC_MASCOTS.map(z => {
+              const active = state.obDraftMascot === z.id;
+              return `
+                <button data-action="ob-pick-mascot" data-mascot="${z.id}" type="button"
+                  class="p-2 rounded-xl border text-center transition flex flex-col items-center gap-1 ${
+                    active
+                      ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 text-emerald-900'
+                      : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                  }">
+                  <span class="w-5 h-5 rounded-full border border-black/10 shadow-2xs" style="background:${z.color}"></span>
+                  <span class="text-[11px] font-bold leading-tight">${z.short}</span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Optional Light Daily Goal (No personal info) -->
+        <div>
+          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Mục tiêu nhẹ nhàng mỗi ngày</label>
+          <div class="grid grid-cols-3 gap-2">
+            ${[
+              { val: 5, label: '5 từ / ngày', sub: 'Thư giãn' },
+              { val: 10, label: '10 từ / ngày', sub: 'Cân bằng' },
+              { val: 20, label: '20 từ / ngày', sub: 'Tăng tốc' }
+            ].map(g => {
+              const active = state.obDraftGoal === g.val;
+              return `
+                <button data-action="ob-pick-goal" data-goal="${g.val}" type="button"
+                  class="p-2.5 rounded-xl border text-center transition ${
+                    active
+                      ? 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-1 ring-emerald-500'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }">
+                  <div class="text-xs font-extrabold">${g.label}</div>
+                  <div class="text-[10px] ${active ? 'text-emerald-700' : 'text-slate-400'}">${g.sub}</div>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 pt-1">
+          <button data-action="ob-skip" type="button"
+            class="px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+            Bỏ qua (gọi là bạn)
+          </button>
+          <button data-action="ob-save" type="button"
+            class="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-xs transition">
+            Bắt đầu học ngay
+          </button>
+        </div>
+      `;
+
+      if (window.lucide) lucide.createIcons();
+      const nickInput = document.getElementById('ob-nickname-input');
+      if (nickInput) {
+        nickInput.addEventListener('input', (ev) => {
+          state.obDraftNickname = ev.target.value;
+        });
+      }
+      if (onboardingMascotViewer) {
+        onboardingMascotViewer.destroy();
+        onboardingMascotViewer = null;
+      }
+      const obCanvas = document.getElementById('ob-mascot-canvas');
+      if (obCanvas) {
+        onboardingMascotViewer = createChibiViewer(obCanvas, state.obDraftMascot);
+      }
+    }
+
+    // Bind floating mascot button & close bubble
+    document.addEventListener('click', async (e) => {
+      if (e.target.closest('#btn-mascot-close-bubble')) {
+        window.PicVocMascot.hide();
+        return;
+      }
+      if (e.target.closest('#btn-mascot-avatar')) {
+        triggerMascotGreeting();
+        return;
+      }
+      const actEl = e.target.closest('[data-action]');
+      if (!actEl) return;
+      const action = actEl.dataset.action;
+      if (action === 'open-onboarding') {
+        closeAuthModal();
+        openOnboardingModal();
+        return;
+      }
+      if (action === 'ob-pick-mascot') {
+        state.obDraftMascot = actEl.dataset.mascot;
+        renderOnboardingModal();
+        return;
+      }
+      if (action === 'ob-pick-goal') {
+        state.obDraftGoal = Number(actEl.dataset.goal) || 10;
+        renderOnboardingModal();
+        return;
+      }
+      if (action === 'ob-skip') {
+        state.profile = {
+          nickname: '',
+          mascot: state.obDraftMascot || 'cat',
+          dailyGoal: state.obDraftGoal || 10,
+          onboarded: true
+        };
+        closeOnboardingModal();
+        await saveUserProfileToCloud();
+        setTimeout(() => triggerMascotGreeting(), 250);
+        return;
+      }
+      if (action === 'ob-save') {
+        state.profile = {
+          nickname: (state.obDraftNickname || '').trim(),
+          mascot: state.obDraftMascot || 'cat',
+          dailyGoal: state.obDraftGoal || 10,
+          onboarded: true
+        };
+        closeOnboardingModal();
+        await saveUserProfileToCloud();
+        setTimeout(() => triggerMascotGreeting(), 250);
+        return;
+      }
+    });
+
     // Ensure browser voices load on Chrome/Cốc Cốc
     if ('speechSynthesis' in window) {
       window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
     }
 
     window.addEventListener('DOMContentLoaded', async () => {
+      initFloatingMascot();
       await loadDataFromSupabase(false);
       await initAuth();
     });
