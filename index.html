@@ -522,7 +522,7 @@
   </div>
 
   <!-- Floating 3D Chibi Mascot Avatar ONLY (Strictly clamped inside screen bounds) -->
-  <div id="mascot-widget" class="fixed bottom-16 md:bottom-5 right-3 sm:right-5 z-40 w-[92px] h-[92px] sm:w-[104px] sm:h-[104px]">
+  <div id="mascot-widget" class="fixed bottom-16 md:bottom-5 right-3 sm:right-5 z-40 w-[104px] h-[104px] sm:w-[118px] sm:h-[118px]">
     <button id="btn-mascot-avatar" type="button" title="Chạm để mở KaDoc AI • Nhấn giữ và kéo để di chuyển quanh màn hình"
       class="relative w-full h-full rounded-full focus:outline-none group transition-transform hover:scale-105 active:scale-95 cursor-grab active:cursor-grabbing select-none touch-none">
       <div class="absolute inset-2 rounded-full bg-gradient-to-tr from-emerald-100/80 via-white/90 to-teal-50/80 border border-white shadow-md group-hover:shadow-lg transition"></div>
@@ -3837,199 +3837,671 @@
       } catch (e) {}
     }
 
-    // ---- Three.js Procedural Chibi 3D Zodiac Builder ----
+    // ---- Three.js Rich Articulated 12-Zodiac Chibi 3D Engine ----
     function buildChibiZodiacMesh(mascotId) {
       const m = getMascotMeta(mascotId);
-      const group = new THREE.Group();
+      const root = new THREE.Group();
+      const anim = { id: mascotId, eyes: [], tailSegs: [], wings: [], ears: [], arms: [], legs: [], extras: {} };
 
-      const bodyMat = new THREE.MeshStandardMaterial({ color: m.hex, roughness: 0.38, metalness: 0.05 });
-      const bellyMat = new THREE.MeshStandardMaterial({ color: m.bellyHex, roughness: 0.45, metalness: 0.02 });
-      const accentMat = new THREE.MeshStandardMaterial({ color: m.accentHex, roughness: 0.35, metalness: 0.08 });
-      const darkMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.15, metalness: 0.1 });
-      const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const cheekMat = new THREE.MeshBasicMaterial({ color: 0xfda4af, transparent: true, opacity: 0.65 });
+      const mat = (color, rough = 0.34, metal = 0.06, opts = {}) =>
+        new THREE.MeshStandardMaterial(Object.assign({ color, roughness: rough, metalness: metal }, opts));
 
-      // Chubby body
-      const body = new THREE.Mesh(new THREE.SphereGeometry(0.68, 28, 24), bodyMat);
-      body.scale.set(1.0, 0.92, 0.92);
-      body.position.y = -0.58;
-      group.add(body);
+      const bodyMat   = mat(m.hex, 0.34, 0.05);
+      const bellyMat  = mat(m.bellyHex, 0.42, 0.02);
+      const accentMat = mat(m.accentHex, 0.30, 0.08);
+      const darkMat   = mat(0x111827, 0.10, 0.15);
+      const whiteMat  = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const cheekMat  = new THREE.MeshBasicMaterial({ color: 0xfb7185, transparent: true, opacity: 0.58 });
+      const goldMat   = mat(0xfbbf24, 0.22, 0.55);
+      const redMat    = mat(0xef4444, 0.28, 0.08);
+      const pinkMat   = mat(0xf472b6, 0.35, 0.04);
+      const creamMat  = mat(0xfef3c7, 0.45, 0.02);
 
-      // Cute belly patch
-      const belly = new THREE.Mesh(new THREE.SphereGeometry(0.48, 24, 20), bellyMat);
-      belly.scale.set(0.92, 0.88, 0.55);
-      belly.position.set(0, -0.60, 0.42);
-      group.add(belly);
+      function addGlossyEyes(parent, spreadX, y, z, radius = 0.115) {
+        [-spreadX, spreadX].forEach(x => {
+          const eyeGrp = new THREE.Group();
+          eyeGrp.position.set(x, y, z);
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(radius, 18, 16), darkMat);
+          eyeGrp.add(eye);
+          const shine1 = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.38, 12, 10), whiteMat);
+          shine1.position.set(radius * 0.30, radius * 0.34, radius * 0.80);
+          eyeGrp.add(shine1);
+          const shine2 = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.18, 10, 8), whiteMat);
+          shine2.position.set(-radius * 0.28, -radius * 0.28, radius * 0.86);
+          eyeGrp.add(shine2);
+          parent.add(eyeGrp);
+          anim.eyes.push(eyeGrp);
 
-      // Little paws
-      [-0.48, 0.48].forEach(x => {
-        const arm = new THREE.Mesh(new THREE.SphereGeometry(0.20, 18, 16), bodyMat);
-        arm.scale.set(0.85, 1.15, 0.85);
-        arm.position.set(x, -0.48, 0.28);
-        arm.rotation.z = x < 0 ? 0.35 : -0.35;
-        group.add(arm);
-      });
-      [-0.28, 0.28].forEach(x => {
-        const foot = new THREE.Mesh(new THREE.SphereGeometry(0.20, 18, 16), bodyMat);
-        foot.scale.set(1.0, 0.65, 1.2);
-        foot.position.set(x, -1.12, 0.18);
-        group.add(foot);
-      });
-
-      // Head group (for cute playful head tilts)
-      const headGroup = new THREE.Group();
-      headGroup.position.set(0, 0.32, 0);
-      group.add(headGroup);
-
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.86, 32, 28), bodyMat);
-      head.scale.set(1.08, 0.96, 0.98);
-      headGroup.add(head);
-
-      // Eyes + glossy specular catchlights
-      [-0.32, 0.32].forEach(x => {
-        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.115, 18, 16), darkMat);
-        eye.position.set(x, 0.06, 0.77);
-        headGroup.add(eye);
-        const shine = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 12), whiteMat);
-        shine.position.set(x + 0.038, 0.105, 0.86);
-        headGroup.add(shine);
-        // Rosy cheeks
-        const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), cheekMat);
-        cheek.scale.set(1.25, 0.65, 0.35);
-        cheek.position.set(x * 1.55, -0.10, 0.69);
-        headGroup.add(cheek);
-      });
-
-      // Muzzle / Nose depending on zodiac
-      if (mascotId === 'pig') {
-        const snout = new THREE.Mesh(new THREE.SphereGeometry(0.24, 20, 16), accentMat);
-        snout.scale.set(1.25, 0.85, 0.65);
-        snout.position.set(0, -0.08, 0.82);
-        headGroup.add(snout);
-        [-0.08, 0.08].forEach(nx => {
-          const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.038, 10, 10), darkMat);
-          nostril.position.set(nx, -0.08, 0.96);
-          headGroup.add(nostril);
+          const cheek = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.95, 14, 10), cheekMat);
+          cheek.scale.set(1.3, 0.62, 0.32);
+          cheek.position.set(x * 1.48, y - radius * 1.35, z - 0.08);
+          parent.add(cheek);
         });
-      } else if (mascotId === 'rooster') {
-        const beak = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.28, 16), new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.3 }));
-        beak.rotation.x = Math.PI / 2;
-        beak.position.set(0, -0.06, 0.90);
-        headGroup.add(beak);
-      } else {
-        const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.23, 20, 16), bellyMat);
-        muzzle.scale.set(1.2, 0.85, 0.65);
-        muzzle.position.set(0, -0.11, 0.76);
-        headGroup.add(muzzle);
-        const nose = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 12), mascotId === 'rat' ? accentMat : darkMat);
-        nose.scale.set(1.2, 0.85, 0.8);
-        nose.position.set(0, -0.04, 0.91);
-        headGroup.add(nose);
       }
 
-      // Signature zodiac ears / horns / crests
-      if (mascotId === 'rat' || mascotId === 'monkey') {
-        const earRadius = mascotId === 'rat' ? 0.36 : 0.28;
-        const earY = mascotId === 'rat' ? 0.64 : 0.14;
-        const earX = mascotId === 'rat' ? 0.64 : 0.88;
-        [-earX, earX].forEach(ex => {
-          const ear = new THREE.Mesh(new THREE.SphereGeometry(earRadius, 20, 16), bodyMat);
-          ear.scale.set(1.0, 1.0, 0.42);
-          ear.position.set(ex, earY, 0.05);
-          headGroup.add(ear);
-          const inner = new THREE.Mesh(new THREE.SphereGeometry(earRadius * 0.65, 16, 12), accentMat);
-          inner.scale.set(1.0, 1.0, 0.35);
-          inner.position.set(ex, earY, 0.14);
-          headGroup.add(inner);
+      function addWhiskers(parent, y, z, color = 0x334155, len = 0.42) {
+        const wMat = mat(color, 0.4, 0.05);
+        [-1, 1].forEach(side => {
+          [-0.14, 0, 0.14].forEach(rotZ => {
+            const w = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.008, len, 6), wMat);
+            w.rotation.z = side * (Math.PI / 2 - 0.12) + rotZ;
+            w.position.set(side * (0.42 + len * 0.32), y + rotZ * 0.35, z);
+            parent.add(w);
+          });
         });
-      } else if (mascotId === 'cat' || mascotId === 'dog' || mascotId === 'horse') {
-        [-0.55, 0.55].forEach(ex => {
-          const ear = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.56, 18), bodyMat);
-          ear.position.set(ex, 0.78, 0.04);
-          ear.rotation.z = ex < 0 ? 0.28 : -0.28;
-          if (mascotId === 'dog') {
-            ear.rotation.z = ex < 0 ? 0.65 : -0.65;
-            ear.position.y = 0.62;
-          }
-          headGroup.add(ear);
-          const inner = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.34, 14), accentMat);
-          inner.position.set(ex, mascotId === 'dog' ? 0.60 : 0.76, 0.12);
-          inner.rotation.z = ear.rotation.z;
-          headGroup.add(inner);
-        });
-        if (mascotId === 'horse') {
-          for (let i = 0; i < 3; i++) {
-            const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.18 - i * 0.02, 14, 12), accentMat);
-            tuft.position.set(0, 0.85 - i * 0.14, 0.22 - i * 0.26);
-            headGroup.add(tuft);
-          }
+      }
+
+      // ============================================================
+      // 1. SNAKE (Tỵ) — Coiling 16-segment serpent + forked red tongue
+      // ============================================================
+      if (mascotId === 'snake') {
+        const coilGroup = new THREE.Group();
+        root.add(coilGroup);
+        const totalSegs = 16;
+        for (let i = 0; i < totalSegs; i++) {
+          const u = i / (totalSegs - 1);
+          const angle = u * Math.PI * 3.1 - 0.4;
+          const radius = 0.72 * (1 - u * 0.62);
+          const segR = (0.14 + Math.sin(u * Math.PI) * 0.16) * (0.85 + u * 0.25);
+          const segGrp = new THREE.Group();
+          const x = Math.cos(angle) * radius;
+          const z = Math.sin(angle) * radius * 0.88;
+          const y = -0.92 + u * 1.38;
+          segGrp.position.set(x, y, z);
+          segGrp.userData.base = { x, y, z, u, angle, radius };
+
+          const segMesh = new THREE.Mesh(new THREE.SphereGeometry(segR, 18, 14), i % 2 === 0 ? bodyMat : mat(0x22c55e, 0.34, 0.05));
+          segMesh.scale.set(1.08, 0.92, 1.08);
+          segGrp.add(segMesh);
+          const scaleBelly = new THREE.Mesh(new THREE.SphereGeometry(segR * 0.72, 12, 10), bellyMat);
+          scaleBelly.position.set(0, -segR * 0.35, segR * 0.32);
+          segGrp.add(scaleBelly);
+
+          coilGroup.add(segGrp);
+          anim.tailSegs.push(segGrp);
         }
+
+        const headGroup = new THREE.Group();
+        headGroup.position.set(0.05, 0.64, 0.18);
+        root.add(headGroup);
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.62, 28, 22), bodyMat);
+        head.scale.set(1.18, 0.86, 1.24);
+        headGroup.add(head);
+
+        // Cute golden forehead jewel
+        const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.13, 0), goldMat);
+        gem.position.set(0, 0.44, 0.46);
+        headGroup.add(gem);
+
+        addGlossyEyes(headGroup, 0.28, 0.12, 0.56, 0.115);
+
+        // Cute nostrils
+        [-0.10, 0.10].forEach(nx => {
+          const n = new THREE.Mesh(new THREE.SphereGeometry(0.032, 10, 8), darkMat);
+          n.position.set(nx, -0.02, 0.74);
+          headGroup.add(n);
+        });
+
+        // Articulated Forked Red Tongue!
+        const tongueGrp = new THREE.Group();
+        tongueGrp.position.set(0, -0.14, 0.72);
+        const stem = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.36), redMat);
+        stem.position.z = 0.16;
+        tongueGrp.add(stem);
+        [-1, 1].forEach(s => {
+          const fork = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.18, 8), redMat);
+          fork.rotation.x = Math.PI / 2;
+          fork.rotation.z = s * -0.38;
+          fork.position.set(s * 0.055, 0, 0.38);
+          tongueGrp.add(fork);
+        });
+        headGroup.add(tongueGrp);
+        anim.extras.tongue = tongueGrp;
+        anim.extras.coilGroup = coilGroup;
+        root.userData.headGroup = headGroup;
+        root.userData.anim = anim;
+        return root;
+      }
+
+      // ============================================================
+      // 2. DRAGON (Thìn) — Flying Eastern Chibi Dragon with flapping wings & pearl
+      // ============================================================
+      if (mascotId === 'dragon') {
+        const bodySegs = 11;
+        for (let i = 0; i < bodySegs; i++) {
+          const u = i / (bodySegs - 1);
+          const segGrp = new THREE.Group();
+          const x = Math.sin(u * Math.PI * 1.4) * 0.32;
+          const y = -0.18 - u * 0.95 + Math.cos(u * Math.PI) * 0.14;
+          const z = -0.12 - u * 0.72;
+          const r = 0.42 * (1 - u * 0.62);
+          segGrp.position.set(x, y, z);
+          segGrp.userData.base = { x, y, z, u };
+
+          const seg = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 14), bodyMat);
+          segGrp.add(seg);
+          const bellyPlate = new THREE.Mesh(new THREE.SphereGeometry(r * 0.76, 12, 10), goldMat);
+          bellyPlate.position.set(0, -r * 0.25, r * 0.45);
+          segGrp.add(bellyPlate);
+          // Golden dorsal fin spike
+          const spike = new THREE.Mesh(new THREE.ConeGeometry(r * 0.32, r * 0.95, 10), goldMat);
+          spike.position.set(0, r * 0.92, -r * 0.15);
+          spike.rotation.x = -0.45;
+          segGrp.add(spike);
+
+          if (i === bodySegs - 1) {
+            // Fiery tail tuft
+            const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.42, 10), goldMat);
+            tuft.rotation.x = -Math.PI / 2;
+            tuft.position.z = -0.22;
+            segGrp.add(tuft);
+          }
+          root.add(segGrp);
+          anim.tailSegs.push(segGrp);
+        }
+
+        // Cute flapping emerald-gold wings
+        [-1, 1].forEach(side => {
+          const wingPivot = new THREE.Group();
+          wingPivot.position.set(side * 0.38, -0.05, -0.18);
+          const wingBlade = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.46, 0.08), mat(0x34d399, 0.28, 0.12));
+          wingBlade.position.set(side * 0.42, 0.14, -0.05);
+          wingBlade.rotation.z = side * 0.28;
+          wingPivot.add(wingBlade);
+          const wingTrim = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.10, 0.11), goldMat);
+          wingTrim.position.set(side * 0.42, 0.34, -0.05);
+          wingTrim.rotation.z = side * 0.28;
+          wingPivot.add(wingTrim);
+          root.add(wingPivot);
+          anim.wings.push({ pivot: wingPivot, side });
+        });
+
+        // Glowing floating Dragon Pearl
+        const pearl = new THREE.Mesh(
+          new THREE.SphereGeometry(0.20, 20, 16),
+          mat(0xfde047, 0.12, 0.45, { emissive: 0xf59e0b, emissiveIntensity: 0.45 })
+        );
+        pearl.position.set(0, -0.35, 0.92);
+        root.add(pearl);
+        anim.extras.pearl = pearl;
+
+        // Dragon Head
+        const headGroup = new THREE.Group();
+        headGroup.position.set(0, 0.56, 0.26);
+        root.add(headGroup);
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.66, 28, 24), bodyMat);
+        head.scale.set(1.06, 0.92, 1.15);
+        headGroup.add(head);
+
+        const snout = new THREE.Mesh(new THREE.SphereGeometry(0.34, 20, 16), bodyMat);
+        snout.scale.set(1.12, 0.72, 1.05);
+        snout.position.set(0, -0.10, 0.58);
+        headGroup.add(snout);
+
+        // Branched Golden Antler Horns
+        [-1, 1].forEach(side => {
+          const h1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.085, 0.62, 10), goldMat);
+          h1.position.set(side * 0.34, 0.68, -0.08);
+          h1.rotation.z = -side * 0.35;
+          h1.rotation.x = -0.25;
+          headGroup.add(h1);
+          const h2 = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.05, 0.28, 8), goldMat);
+          h2.position.set(side * 0.50, 0.82, -0.02);
+          h2.rotation.z = -side * 0.95;
+          headGroup.add(h2);
+
+          // Flowing Dragon Whiskers / Barbels
+          const barbel = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.025, 8, 18, Math.PI * 0.9), goldMat);
+          barbel.position.set(side * 0.38, -0.14, 0.64);
+          barbel.rotation.y = side * 0.4;
+          barbel.rotation.z = side * 0.6;
+          headGroup.add(barbel);
+        });
+
+        addGlossyEyes(headGroup, 0.28, 0.14, 0.58, 0.115);
+        root.userData.headGroup = headGroup;
+        root.userData.anim = anim;
+        return root;
+      }
+
+      // ============================================================
+      // 3. ROOSTER (Dậu) — Avian teardrop body, flapping wings, fan tail & comb
+      // ============================================================
+      if (mascotId === 'rooster') {
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.68, 28, 22), bodyMat);
+        body.scale.set(0.96, 0.92, 1.15);
+        body.position.set(0, -0.45, -0.05);
+        root.add(body);
+
+        const breast = new THREE.Mesh(new THREE.SphereGeometry(0.50, 22, 18), bellyMat);
+        breast.scale.set(0.92, 0.88, 0.72);
+        breast.position.set(0, -0.46, 0.38);
+        root.add(breast);
+
+        // Flapping side wings
+        [-1, 1].forEach(side => {
+          const wp = new THREE.Group();
+          wp.position.set(side * 0.60, -0.34, 0.02);
+          const wing = new THREE.Mesh(new THREE.SphereGeometry(0.32, 18, 14), mat(0xf59e0b, 0.35, 0.05));
+          wing.scale.set(0.45, 0.95, 1.35);
+          wing.position.set(side * 0.10, -0.10, -0.06);
+          wp.add(wing);
+          root.add(wp);
+          anim.wings.push({ pivot: wp, side });
+        });
+
+        // 5-Feather Colorful Fan Tail
+        const tailFan = new THREE.Group();
+        tailFan.position.set(0, -0.20, -0.72);
+        const featherColors = [0xef4444, 0xf97316, 0x0d9488, 0xf97316, 0xef4444];
+        featherColors.forEach((fc, idx) => {
+          const f = new THREE.Mesh(new THREE.SphereGeometry(0.24, 14, 12), mat(fc, 0.32, 0.06));
+          f.scale.set(0.32, 1.45, 0.65);
+          const spread = (idx - 2) * 0.24;
+          f.position.set(spread * 0.65, 0.26 - Math.abs(idx - 2) * 0.06, -0.14);
+          f.rotation.z = -spread;
+          f.rotation.x = -0.38;
+          tailFan.add(f);
+        });
+        root.add(tailFan);
+        anim.tailSegs.push(tailFan);
+
+        // Little orange chicken feet
+        const footMat = mat(0xf97316, 0.35, 0.05);
+        [-0.26, 0.26].forEach(x => {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.36, 10), footMat);
+          leg.position.set(x, -1.08, 0.08);
+          root.add(leg);
+          const claw = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.07, 0.28), footMat);
+          claw.position.set(x, -1.24, 0.16);
+          root.add(claw);
+        });
+
+        // Rooster Head
+        const headGroup = new THREE.Group();
+        headGroup.position.set(0, 0.42, 0.18);
+        root.add(headGroup);
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.64, 28, 24), bodyMat);
+        headGroup.add(head);
+
+        // Iconic 3-Lobe Red Comb
+        [-0.16, 0, 0.16].forEach((cz, i) => {
+          const lobe = new THREE.Mesh(new THREE.SphereGeometry(i === 1 ? 0.21 : 0.15, 16, 14), redMat);
+          lobe.scale.set(0.65, 1.25, 1.0);
+          lobe.position.set(0, 0.68 + (i === 1 ? 0.08 : 0), cz + 0.06);
+          headGroup.add(lobe);
+        });
+
+        // Golden Beak + Red Wattle
+        const beak = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.34, 16), footMat);
+        beak.rotation.x = Math.PI / 2;
+        beak.position.set(0, -0.05, 0.72);
+        headGroup.add(beak);
+        const wattle = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 12), redMat);
+        wattle.scale.set(0.85, 1.25, 0.7);
+        wattle.position.set(0, -0.24, 0.60);
+        headGroup.add(wattle);
+
+        addGlossyEyes(headGroup, 0.28, 0.10, 0.54, 0.11);
+        root.userData.headGroup = headGroup;
+        root.userData.anim = anim;
+        return root;
+      }
+
+      // ============================================================
+      // 4..12. SCULPTED MAMMAL ZODIACS (Each with unique body, face, tail & props!)
+      // ============================================================
+      // Custom body silhouette per species
+      const bodyGroup = new THREE.Group();
+      root.add(bodyGroup);
+
+      if (mascotId === 'goat') {
+        // Cloud-fluffy wool cluster body!
+        const core = new THREE.Mesh(new THREE.SphereGeometry(0.62, 24, 20), bodyMat);
+        core.position.set(0, -0.56, 0);
+        bodyGroup.add(core);
+        const puffOffsets = [
+          [0, -0.45, 0.42], [-0.42, -0.48, 0.28], [0.42, -0.48, 0.28],
+          [-0.45, -0.68, -0.10], [0.45, -0.68, -0.10], [0, -0.64, -0.44],
+          [-0.28, -0.28, 0.32], [0.28, -0.28, 0.32]
+        ];
+        puffOffsets.forEach(([px, py, pz]) => {
+          const puff = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), creamMat);
+          puff.position.set(px, py, pz);
+          bodyGroup.add(puff);
+        });
+      } else {
+        const bodyScale = mascotId === 'ox' ? [1.14, 0.96, 1.02]
+          : mascotId === 'pig' ? [1.15, 0.92, 1.08]
+          : mascotId === 'rat' ? [0.90, 1.04, 0.94]
+          : mascotId === 'monkey' ? [0.86, 1.02, 0.88]
+          : mascotId === 'horse' ? [0.95, 1.02, 1.12]
+          : [0.98, 0.96, 0.96];
+        const body = new THREE.Mesh(new THREE.SphereGeometry(0.64, 28, 24), bodyMat);
+        body.scale.set(bodyScale[0], bodyScale[1], bodyScale[2]);
+        body.position.y = -0.56;
+        bodyGroup.add(body);
+
+        const belly = new THREE.Mesh(new THREE.SphereGeometry(0.46, 22, 18), bellyMat);
+        belly.scale.set(0.92 * bodyScale[0], 0.86, 0.56);
+        belly.position.set(0, -0.58, 0.40 * bodyScale[2]);
+        bodyGroup.add(belly);
+      }
+
+      // Articulated Arms & Legs
+      [-1, 1].forEach(side => {
+        const armPivot = new THREE.Group();
+        armPivot.position.set(side * 0.52, -0.34, 0.22);
+        const armLen = mascotId === 'monkey' ? 0.42 : 0.28;
+        const arm = new THREE.Mesh(new THREE.SphereGeometry(0.18, 16, 14), bodyMat);
+        arm.scale.set(0.82, armLen / 0.18, 0.82);
+        arm.position.set(0, -armLen * 0.42, 0.06);
+        arm.rotation.z = side * -0.32;
+        armPivot.add(arm);
+        bodyGroup.add(armPivot);
+        anim.arms.push({ pivot: armPivot, side });
+
+        const legPivot = new THREE.Group();
+        legPivot.position.set(side * 0.28, -1.04, 0.14);
+        const footMat = (mascotId === 'horse' || mascotId === 'ox' || mascotId === 'goat') ? darkMat : bodyMat;
+        const foot = new THREE.Mesh(new THREE.SphereGeometry(0.19, 16, 14), footMat);
+        foot.scale.set(0.96, 0.68, 1.18);
+        legPivot.add(foot);
+        bodyGroup.add(legPivot);
+        anim.legs.push({ pivot: legPivot, side });
+      });
+
+      // Species-Specific Articulated Tails!
+      if (mascotId === 'pig') {
+        const curly = new THREE.Group();
+        curly.position.set(0, -0.68, -0.68);
+        for (let i = 0; i < 6; i++) {
+          const a = i * 1.15;
+          const dot = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 8), pinkMat);
+          dot.position.set(Math.cos(a) * 0.11, Math.sin(a) * 0.11, -i * 0.05);
+          curly.add(dot);
+        }
+        bodyGroup.add(curly);
+        anim.extras.curlyTail = curly;
+      } else if (mascotId === 'tiger' || mascotId === 'cat' || mascotId === 'monkey' || mascotId === 'rat' || mascotId === 'dog' || mascotId === 'horse' || mascotId === 'ox') {
+        const segCount = (mascotId === 'monkey' || mascotId === 'rat') ? 8 : (mascotId === 'tiger' || mascotId === 'cat') ? 6 : 4;
+        for (let i = 0; i < segCount; i++) {
+          const u = i / Math.max(1, segCount - 1);
+          const sg = new THREE.Group();
+          const baseZ = -0.58 - u * (mascotId === 'dog' ? 0.36 : 0.68);
+          const baseY = -0.68 + Math.sin(u * Math.PI * 0.85) * (mascotId === 'cat' || mascotId === 'monkey' ? 0.62 : 0.32);
+          const baseX = (mascotId === 'monkey' || mascotId === 'rat') ? Math.sin(u * Math.PI * 1.6) * 0.22 : 0;
+          sg.position.set(baseX, baseY, baseZ);
+          sg.userData.base = { x: baseX, y: baseY, z: baseZ, u };
+
+          let tMat = bodyMat;
+          if (mascotId === 'rat') tMat = pinkMat;
+          else if (mascotId === 'tiger' && i % 2 === 1) tMat = accentMat;
+          else if ((mascotId === 'horse' || mascotId === 'ox') && i >= segCount - 2) tMat = accentMat;
+
+          const rad = mascotId === 'rat' ? (0.065 - u * 0.025) : mascotId === 'horse' ? (0.14 + u * 0.04) : (0.11 - u * 0.025);
+          const mSeg = new THREE.Mesh(new THREE.SphereGeometry(rad, 12, 10), tMat);
+          sg.add(mSeg);
+          bodyGroup.add(sg);
+          anim.tailSegs.push(sg);
+        }
+      }
+
+      // Species-Specific Accessories on Body
+      if (mascotId === 'cat') {
+        // Red collar + golden jingle bell
+        const collar = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.065, 10, 24), redMat);
+        collar.rotation.x = Math.PI / 2;
+        collar.position.set(0, -0.06, 0.02);
+        bodyGroup.add(collar);
+        const bell = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 12), goldMat);
+        bell.position.set(0, -0.14, 0.50);
+        bodyGroup.add(bell);
+      } else if (mascotId === 'dog') {
+        const collar = new THREE.Mesh(new THREE.TorusGeometry(0.49, 0.065, 10, 24), mat(0x0284c7, 0.35, 0.05));
+        collar.rotation.x = Math.PI / 2;
+        collar.position.set(0, -0.06, 0.02);
+        bodyGroup.add(collar);
+        const tag = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.04, 14), goldMat);
+        tag.rotation.x = Math.PI / 2;
+        tag.position.set(0, -0.16, 0.51);
+        bodyGroup.add(tag);
+      } else if (mascotId === 'rat') {
+        // Golden Swiss cheese wedge held by paws!
+        const cheese = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.16, 3), goldMat);
+        cheese.rotation.x = Math.PI / 2;
+        cheese.position.set(0, -0.44, 0.62);
+        bodyGroup.add(cheese);
+        anim.extras.cheese = cheese;
       } else if (mascotId === 'tiger') {
-        [-0.58, 0.58].forEach(ex => {
-          const ear = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 16), bodyMat);
-          ear.position.set(ex, 0.68, 0.05);
-          headGroup.add(ear);
+        // Tiger back stripes
+        [-0.36, -0.58, -0.80].forEach(sy => {
+          const st = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.08, 0.14), accentMat);
+          st.position.set(0, sy, -0.56);
+          bodyGroup.add(st);
         });
-        // Forehead tiger stripes
-        [-0.14, 0, 0.14].forEach(sx => {
-          const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.24, 0.08), accentMat);
-          stripe.position.set(sx, 0.54, 0.72);
-          headGroup.add(stripe);
+      }
+
+      // ---- Head Group ----
+      const headGroup = new THREE.Group();
+      headGroup.position.set(0, 0.38, 0.06);
+      root.add(headGroup);
+
+      const headScale = mascotId === 'horse' ? [0.94, 0.96, 1.18]
+        : mascotId === 'rat' ? [1.02, 0.92, 1.14]
+        : [1.08, 0.96, 0.98];
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.78, 32, 26), bodyMat);
+      head.scale.set(headScale[0], headScale[1], headScale[2]);
+      headGroup.add(head);
+
+      // Monkey cream face mask
+      if (mascotId === 'monkey') {
+        const mask = new THREE.Mesh(new THREE.SphereGeometry(0.58, 24, 20), bellyMat);
+        mask.scale.set(1.06, 0.88, 0.56);
+        mask.position.set(0, -0.06, 0.44);
+        headGroup.add(mask);
+      }
+
+      addGlossyEyes(headGroup, 0.30, 0.08, 0.68 * headScale[2], 0.115);
+
+      // Species-Specific Muzzles, Noses, Fangs, Tongues & Stripes
+      if (mascotId === 'pig') {
+        const snout = new THREE.Mesh(new THREE.SphereGeometry(0.25, 22, 16), pinkMat);
+        snout.scale.set(1.32, 0.86, 0.65);
+        snout.position.set(0, -0.08, 0.76);
+        headGroup.add(snout);
+        [-0.085, 0.085].forEach(nx => {
+          const nos = new THREE.Mesh(new THREE.SphereGeometry(0.042, 10, 8), darkMat);
+          nos.position.set(nx, -0.08, 0.91);
+          headGroup.add(nos);
         });
-      } else if (mascotId === 'ox' || mascotId === 'goat' || mascotId === 'dragon') {
-        // Cute curved horns
-        [-0.42, 0.42].forEach(hx => {
-          const horn = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.52, 16), accentMat);
-          horn.position.set(hx, 0.82, 0.08);
-          horn.rotation.z = hx < 0 ? 0.42 : -0.42;
-          headGroup.add(horn);
-          const ear = new THREE.Mesh(new THREE.SphereGeometry(0.20, 14, 12), bodyMat);
-          ear.scale.set(1.3, 0.7, 0.5);
-          ear.position.set(hx * 1.9, 0.34, 0.02);
-          headGroup.add(ear);
+        anim.extras.snout = snout;
+      } else if (mascotId === 'ox') {
+        const muz = new THREE.Mesh(new THREE.SphereGeometry(0.30, 22, 16), pinkMat);
+        muz.scale.set(1.36, 0.82, 0.72);
+        muz.position.set(0, -0.16, 0.68);
+        headGroup.add(muz);
+        [-0.12, 0.12].forEach(nx => {
+          const nos = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), darkMat);
+          nos.position.set(nx, -0.14, 0.88);
+          headGroup.add(nos);
         });
-        if (mascotId === 'dragon') {
-          for (let i = 0; i < 3; i++) {
-            const spike = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.24, 12), accentMat);
-            spike.position.set(0, 0.84 - i * 0.22, -0.10 - i * 0.32);
-            spike.rotation.x = -0.6;
-            headGroup.add(spike);
-          }
+        // Iconic Golden Nose Ring!
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.028, 10, 20), goldMat);
+        ring.position.set(0, -0.26, 0.88);
+        headGroup.add(ring);
+        anim.extras.ring = ring;
+      } else if (mascotId === 'horse') {
+        const muz = new THREE.Mesh(new THREE.SphereGeometry(0.32, 22, 16), bellyMat);
+        muz.scale.set(0.92, 0.82, 1.15);
+        muz.position.set(0, -0.16, 0.78);
+        headGroup.add(muz);
+        const blaze = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.42, 0.08), creamMat);
+        blaze.position.set(0, 0.24, 0.86);
+        blaze.rotation.x = -0.25;
+        headGroup.add(blaze);
+        // Flowing Horse Mane along head
+        for (let i = 0; i < 5; i++) {
+          const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.19 - i * 0.015, 14, 12), accentMat);
+          tuft.position.set(0, 0.80 - i * 0.16, 0.18 - i * 0.26);
+          headGroup.add(tuft);
         }
+      } else {
+        const muz = new THREE.Mesh(new THREE.SphereGeometry(0.24, 20, 16), bellyMat);
+        muz.scale.set(mascotId === 'tiger' ? 1.35 : 1.18, 0.82, 0.70);
+        muz.position.set(0, -0.12, 0.70 * headScale[2]);
+        headGroup.add(muz);
+        const nose = new THREE.Mesh(new THREE.SphereGeometry(0.08, 14, 12), (mascotId === 'rat' || mascotId === 'cat') ? pinkMat : darkMat);
+        nose.scale.set(1.22, 0.82, 0.80);
+        nose.position.set(0, -0.04, 0.85 * headScale[2]);
+        headGroup.add(nose);
+        anim.extras.nose = nose;
+
+        if (mascotId === 'dog') {
+          // Happy panting pink tongue!
+          const tongue = new THREE.Mesh(new THREE.SphereGeometry(0.095, 14, 12), pinkMat);
+          tongue.scale.set(0.85, 1.35, 0.45);
+          tongue.position.set(0, -0.25, 0.82);
+          headGroup.add(tongue);
+          anim.extras.tongue = tongue;
+        } else if (mascotId === 'tiger') {
+          // Classic forehead "王" (King) tiger stripes + cheek stripes + tiny fangs!
+          [-0.14, 0, 0.14].forEach(sx => {
+            const v = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.28, 0.08), accentMat);
+            v.position.set(sx, 0.48, 0.64);
+            headGroup.add(v);
+          });
+          const hBar = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.055, 0.08), accentMat);
+          hBar.position.set(0, 0.50, 0.65);
+          headGroup.add(hBar);
+          [-1, 1].forEach(s => {
+            [-0.08, 0.06].forEach(cy => {
+              const cs = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.055, 0.08), accentMat);
+              cs.position.set(s * 0.62, cy, 0.44);
+              cs.rotation.y = s * 0.55;
+              headGroup.add(cs);
+            });
+            const fang = new THREE.Mesh(new THREE.ConeGeometry(0.038, 0.10, 8), whiteMat);
+            fang.rotation.x = Math.PI;
+            fang.position.set(s * 0.11, -0.24, 0.78);
+            headGroup.add(fang);
+          });
+        } else if (mascotId === 'cat' || mascotId === 'rat') {
+          addWhiskers(headGroup, -0.08, 0.68 * headScale[2], 0x334155, mascotId === 'rat' ? 0.46 : 0.40);
+        } else if (mascotId === 'goat') {
+          // Cute little chin goatee beard
+          const beard = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.28, 12), creamMat);
+          beard.rotation.x = Math.PI;
+          beard.position.set(0, -0.44, 0.64);
+          headGroup.add(beard);
+          anim.extras.beard = beard;
+        }
+      }
+
+      // Species-Specific Articulated Ears & Horns
+      if (mascotId === 'rat' || mascotId === 'monkey') {
+        const earR = mascotId === 'rat' ? 0.38 : 0.28;
+        const earY = mascotId === 'rat' ? 0.62 : 0.12;
+        const earX = mascotId === 'rat' ? 0.62 : 0.82;
+        [-1, 1].forEach(side => {
+          const ep = new THREE.Group();
+          ep.position.set(side * earX, earY, 0.04);
+          const ear = new THREE.Mesh(new THREE.SphereGeometry(earR, 20, 16), bodyMat);
+          ear.scale.set(1.0, 1.0, 0.38);
+          ep.add(ear);
+          const inner = new THREE.Mesh(new THREE.SphereGeometry(earR * 0.66, 16, 12), mascotId === 'rat' ? pinkMat : bellyMat);
+          inner.scale.set(1.0, 1.0, 0.32);
+          inner.position.z = 0.09;
+          ep.add(inner);
+          headGroup.add(ep);
+          anim.ears.push({ pivot: ep, side });
+        });
+      } else if (mascotId === 'cat' || mascotId === 'horse') {
+        [-1, 1].forEach(side => {
+          const ep = new THREE.Group();
+          ep.position.set(side * 0.50, 0.72, 0.04);
+          const ear = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.56, 16), bodyMat);
+          ear.rotation.z = -side * 0.24;
+          ep.add(ear);
+          const inner = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.34, 12), pinkMat);
+          inner.position.z = 0.09;
+          inner.rotation.z = -side * 0.24;
+          ep.add(inner);
+          headGroup.add(ep);
+          anim.ears.push({ pivot: ep, side });
+        });
+      } else if (mascotId === 'dog') {
+        // Floppy articulated puppy ears!
+        [-1, 1].forEach(side => {
+          const ep = new THREE.Group();
+          ep.position.set(side * 0.70, 0.36, 0.06);
+          const ear = new THREE.Mesh(new THREE.SphereGeometry(0.26, 18, 14), accentMat);
+          ear.scale.set(0.62, 1.55, 0.48);
+          ear.position.set(side * 0.06, -0.26, 0);
+          ear.rotation.z = side * 0.16;
+          ep.add(ear);
+          headGroup.add(ep);
+          anim.ears.push({ pivot: ep, side });
+        });
+      } else if (mascotId === 'tiger') {
+        [-1, 1].forEach(side => {
+          const ep = new THREE.Group();
+          ep.position.set(side * 0.56, 0.64, 0.05);
+          const ear = new THREE.Mesh(new THREE.SphereGeometry(0.23, 18, 14), bodyMat);
+          ep.add(ear);
+          const inner = new THREE.Mesh(new THREE.SphereGeometry(0.13, 14, 10), creamMat);
+          inner.position.z = 0.14;
+          ep.add(inner);
+          headGroup.add(ep);
+          anim.ears.push({ pivot: ep, side });
+        });
+      } else if (mascotId === 'pig') {
+        [-1, 1].forEach(side => {
+          const ep = new THREE.Group();
+          ep.position.set(side * 0.56, 0.62, 0.12);
+          const ear = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.44, 16), bodyMat);
+          ear.rotation.z = -side * 0.68;
+          ear.rotation.x = 0.34;
+          ep.add(ear);
+          headGroup.add(ep);
+          anim.ears.push({ pivot: ep, side });
+        });
+      } else if (mascotId === 'ox' || mascotId === 'goat') {
+        // Sweeping curved horns using Torus arcs!
+        const hornMat = mascotId === 'ox' ? creamMat : accentMat;
+        [-1, 1].forEach(side => {
+          const horn = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.085, 12, 20, Math.PI * 0.68), hornMat);
+          horn.position.set(side * 0.54, 0.66, 0.02);
+          horn.rotation.z = side > 0 ? -0.35 : Math.PI - 0.95;
+          horn.rotation.y = side * 0.22;
+          headGroup.add(horn);
+
+          const ep = new THREE.Group();
+          ep.position.set(side * 0.78, 0.28, 0.04);
+          const ear = new THREE.Mesh(new THREE.SphereGeometry(0.20, 14, 12), bodyMat);
+          ear.scale.set(1.32, 0.65, 0.48);
+          ep.add(ear);
+          headGroup.add(ep);
+          anim.ears.push({ pivot: ep, side });
+        });
         if (mascotId === 'goat') {
           [-0.18, 0, 0.18].forEach(wx => {
-            const wool = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 14), bellyMat);
-            wool.position.set(wx, 0.80, 0.25);
+            const wool = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 14), creamMat);
+            wool.position.set(wx, 0.74, 0.22);
             headGroup.add(wool);
           });
         }
-      } else if (mascotId === 'rooster') {
-        // Cute red comb on top
-        [-0.16, 0, 0.16].forEach((cx, i) => {
-          const comb = new THREE.Mesh(new THREE.SphereGeometry(i === 1 ? 0.20 : 0.14, 16, 14), accentMat);
-          comb.position.set(cx, 0.88 + (i === 1 ? 0.06 : 0), 0.12);
-          headGroup.add(comb);
-        });
-      } else if (mascotId === 'pig') {
-        [-0.58, 0.58].forEach(ex => {
-          const ear = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.42, 16), bodyMat);
-          ear.position.set(ex, 0.68, 0.14);
-          ear.rotation.z = ex < 0 ? 0.62 : -0.62;
-          ear.rotation.x = 0.28;
-          headGroup.add(ear);
-        });
-      } else if (mascotId === 'snake') {
-        // Cute golden mini crown crest
-        const crown = new THREE.Mesh(new THREE.ConeGeometry(0.20, 0.32, 6), accentMat);
-        crown.position.set(0, 0.90, 0.10);
-        headGroup.add(crown);
       }
 
-      group.userData.headGroup = headGroup;
-      return group;
+      root.userData.headGroup = headGroup;
+      root.userData.anim = anim;
+      return root;
     }
 
-    // ---- 3D Viewport Controller (used for both Floating Widget & Onboarding Preview) ----
+    // ---- 3D Viewport Controller with Species-Specific Living Animations ----
     function createChibiViewer(canvasEl, initialMascotId) {
       if (!canvasEl || !window.THREE) return null;
       let renderer;
@@ -4039,22 +4511,23 @@
         return null;
       }
       const rect = canvasEl.getBoundingClientRect();
-      const w = Math.max(rect.width || 104, 80);
-      const h = Math.max(rect.height || 104, 80);
+      const w = Math.max(rect.width || 112, 88);
+      const h = Math.max(rect.height || 112, 88);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       renderer.setSize(w, h, false);
 
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(36, w / h, 0.1, 50);
-      camera.position.set(0, 0.12, 4.45);
+      const camera = new THREE.PerspectiveCamera(38, w / h, 0.1, 50);
+      camera.position.set(0, 0.08, 4.95);
 
-      const hemi = new THREE.HemisphereLight(0xffffff, 0xcbd5e1, 1.05);
+      // 3-Point Designer Toy Studio Lighting
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x94a3b8, 1.12);
       scene.add(hemi);
-      const key = new THREE.DirectionalLight(0xffffff, 0.85);
-      key.position.set(2.5, 4.0, 3.5);
+      const key = new THREE.DirectionalLight(0xfffbeb, 0.92);
+      key.position.set(2.8, 4.5, 4.0);
       scene.add(key);
-      const rim = new THREE.DirectionalLight(0xa7f3d0, 0.45);
-      rim.position.set(-2.5, 1.5, -2.5);
+      const rim = new THREE.DirectionalLight(0x6ee7b7, 0.55);
+      rim.position.set(-3.0, 1.8, -2.8);
       scene.add(rim);
 
       let mesh = buildChibiZodiacMesh(initialMascotId);
@@ -4070,14 +4543,165 @@
         if (bounceBoost > 0.01) bounceBoost *= 0.91;
         else bounceBoost = 0;
 
-        // Playful idle sway + bobbing ("ngoáy qua ngoáy lại")
-        mesh.position.y = Math.sin(t * 2.6) * 0.08 + Math.sin(bounceBoost * Math.PI) * 0.35;
-        mesh.rotation.y = Math.sin(t * 1.45) * 0.36 + bounceBoost * 1.8;
-        mesh.rotation.z = Math.sin(t * 1.9) * 0.06;
-        if (mesh.userData.headGroup) {
-          mesh.userData.headGroup.rotation.z = Math.sin(t * 2.2) * 0.10;
-          mesh.userData.headGroup.rotation.x = Math.sin(t * 1.7) * 0.06;
+        const a = mesh.userData.anim || {};
+        const head = mesh.userData.headGroup;
+        const id = a.id;
+
+        // Natural periodic eye blink (~every 3.4s)
+        const blinkCycle = t % 3.4;
+        const blinkScaleY = (blinkCycle > 3.22 && blinkCycle < 3.34) ? 0.12 : 1.0;
+        if (a.eyes) {
+          a.eyes.forEach(e => { e.scale.y = blinkScaleY; });
         }
+
+        // Species-specific living choreography!
+        if (id === 'snake') {
+          // Slithering circular sway + wave ripple through coil + periodic forked tongue flick!
+          mesh.position.y = Math.sin(t * 2.2) * 0.06 + Math.sin(bounceBoost * Math.PI) * 0.30;
+          mesh.rotation.y = Math.sin(t * 1.15) * 0.55 + bounceBoost * 2.2;
+          a.tailSegs.forEach(seg => {
+            const b = seg.userData.base;
+            const wave = Math.sin(t * 3.8 - b.u * 6.0) * 0.07 * (0.4 + b.u);
+            seg.position.x = b.x + Math.cos(b.angle) * wave;
+            seg.position.z = b.z + Math.sin(b.angle) * wave;
+            seg.position.y = b.y + Math.sin(t * 3.0 - b.u * 4.5) * 0.03;
+          });
+          if (head) {
+            head.position.x = 0.05 + Math.sin(t * 2.4) * 0.10;
+            head.rotation.y = Math.sin(t * 2.0) * 0.25;
+            head.rotation.z = Math.sin(t * 1.8) * 0.08;
+          }
+          if (a.extras.tongue) {
+            const tc = t % 2.6;
+            const out = (tc > 1.7 && tc < 2.35) ? Math.sin(((tc - 1.7) / 0.65) * Math.PI) : 0;
+            a.extras.tongue.scale.z = 0.05 + out * 1.15;
+            a.extras.tongue.rotation.y = Math.sin(t * 26) * 0.28 * out;
+          }
+        } else if (id === 'dragon') {
+          // Real soaring figure-8 flight + wing flapping + undulating serpentine tail + floating pearl!
+          mesh.position.x = Math.sin(t * 1.4) * 0.18;
+          mesh.position.y = Math.sin(t * 2.8) * 0.14 + Math.sin(bounceBoost * Math.PI) * 0.35;
+          mesh.rotation.y = Math.sin(t * 1.4) * 0.42 + bounceBoost * 2.4;
+          mesh.rotation.z = -Math.cos(t * 1.4) * 0.12;
+          a.wings.forEach(w => {
+            w.pivot.rotation.z = w.side * (0.20 + Math.sin(t * 8.5) * 0.52);
+          });
+          a.tailSegs.forEach(seg => {
+            const b = seg.userData.base;
+            seg.position.x = b.x + Math.sin(t * 4.8 - b.u * 5.2) * (0.06 + b.u * 0.22);
+            seg.position.y = b.y + Math.cos(t * 4.2 - b.u * 4.0) * 0.07;
+          });
+          if (a.extras.pearl) {
+            a.extras.pearl.position.y = -0.32 + Math.sin(t * 3.6) * 0.10;
+            a.extras.pearl.rotation.y = t * 2.0;
+          }
+          if (head) head.rotation.x = Math.sin(t * 2.8) * 0.08;
+        } else if (id === 'rooster') {
+          // Proud wing flapping + rooster head bob + tail fan sway!
+          mesh.position.y = Math.abs(Math.sin(t * 3.4)) * 0.10 + Math.sin(bounceBoost * Math.PI) * 0.32;
+          mesh.rotation.y = Math.sin(t * 1.3) * 0.35 + bounceBoost * 2.0;
+          a.wings.forEach(w => {
+            w.pivot.rotation.z = w.side * (0.15 + Math.abs(Math.sin(t * 6.8)) * 0.48);
+          });
+          if (head) {
+            head.rotation.x = Math.sin(t * 4.4) * 0.12;
+            head.position.z = 0.18 + Math.sin(t * 4.4) * 0.06;
+          }
+          if (a.tailSegs[0]) a.tailSegs[0].rotation.z = Math.sin(t * 3.2) * 0.14;
+        } else if (id === 'tiger') {
+          // Playful tiger cub crouch-and-pounce + swishing ringed tail!
+          const pounce = Math.max(0, Math.sin(t * 2.6));
+          mesh.position.y = pounce * 0.12 + Math.sin(bounceBoost * Math.PI) * 0.36;
+          mesh.scale.y = 0.94 + pounce * 0.08;
+          mesh.rotation.y = Math.sin(t * 1.4) * 0.36 + bounceBoost * 1.8;
+          a.tailSegs.forEach(seg => {
+            const b = seg.userData.base;
+            seg.position.x = b.x + Math.sin(t * 5.2 - b.u * 3.2) * (0.08 + b.u * 0.30);
+          });
+          if (head) {
+            head.rotation.z = Math.sin(t * 2.2) * 0.10;
+            head.rotation.x = (1 - pounce) * 0.08;
+          }
+        } else if (id === 'cat') {
+          // Maneki-neko beckoning right paw wave + graceful S-tail sway!
+          mesh.position.y = Math.sin(t * 2.4) * 0.06 + Math.sin(bounceBoost * Math.PI) * 0.32;
+          mesh.rotation.y = Math.sin(t * 1.2) * 0.30 + bounceBoost * 1.8;
+          a.arms.forEach(arm => {
+            if (arm.side > 0) arm.pivot.rotation.x = -1.25 + Math.sin(t * 5.6) * 0.55;
+          });
+          a.tailSegs.forEach(seg => {
+            const b = seg.userData.base;
+            seg.position.x = b.x + Math.sin(t * 3.0 - b.u * 2.6) * (0.05 + b.u * 0.26);
+          });
+          if (head) head.rotation.z = Math.sin(t * 2.0) * 0.12;
+        } else if (id === 'dog') {
+          // Excited puppy bounce + fast joyful tail wag + bouncing floppy ears + panting tongue!
+          mesh.position.y = Math.abs(Math.sin(t * 4.2)) * 0.12 + Math.sin(bounceBoost * Math.PI) * 0.35;
+          mesh.rotation.y = Math.sin(t * 1.6) * 0.32 + bounceBoost * 1.9;
+          a.tailSegs.forEach(seg => {
+            const b = seg.userData.base;
+            seg.position.x = b.x + Math.sin(t * 13.5 - b.u * 2.0) * (0.08 + b.u * 0.28);
+          });
+          a.ears.forEach(e => {
+            e.pivot.rotation.z = e.side * (0.10 + Math.abs(Math.sin(t * 4.2)) * 0.24);
+          });
+          if (a.extras.tongue) a.extras.tongue.scale.y = 1.2 + Math.sin(t * 10) * 0.22;
+        } else if (id === 'pig') {
+          // Cheerful piggy waddle + ear flop + spinning corkscrew tail!
+          mesh.position.y = Math.abs(Math.sin(t * 3.2)) * 0.09 + Math.sin(bounceBoost * Math.PI) * 0.34;
+          mesh.rotation.z = Math.sin(t * 3.2) * 0.08;
+          mesh.rotation.y = Math.sin(t * 1.35) * 0.34 + bounceBoost * 1.8;
+          if (a.extras.curlyTail) a.extras.curlyTail.rotation.z = t * 5.0;
+          if (a.extras.snout) a.extras.snout.position.y = -0.08 + Math.sin(t * 6.4) * 0.025;
+          a.ears.forEach(e => { e.pivot.rotation.z = e.side * Math.sin(t * 3.2) * 0.16; });
+        } else if (id === 'rat') {
+          // Nibbling cheese + rapid nose twitch + whipping pink tail!
+          mesh.position.y = Math.sin(t * 3.0) * 0.07 + Math.sin(bounceBoost * Math.PI) * 0.34;
+          mesh.rotation.y = Math.sin(t * 1.5) * 0.34 + bounceBoost * 1.8;
+          a.arms.forEach(arm => { arm.pivot.rotation.x = -0.65 + Math.sin(t * 8.0) * 0.22; });
+          if (a.extras.cheese) a.extras.cheese.position.y = -0.40 + Math.sin(t * 8.0) * 0.06;
+          if (a.extras.nose) a.extras.nose.position.y = -0.04 + Math.sin(t * 14.0) * 0.02;
+          a.tailSegs.forEach(seg => {
+            const b = seg.userData.base;
+            seg.position.x = b.x + Math.sin(t * 6.2 - b.u * 4.0) * (0.06 + b.u * 0.25);
+          });
+        } else if (id === 'monkey') {
+          // Cheeky jungle bounce + waving arms + curling spiral tail!
+          mesh.position.y = Math.abs(Math.sin(t * 3.8)) * 0.14 + Math.sin(bounceBoost * Math.PI) * 0.36;
+          mesh.rotation.y = Math.sin(t * 1.8) * 0.38 + bounceBoost * 2.0;
+          a.arms.forEach(arm => { arm.pivot.rotation.x = Math.sin(t * 5.2 + arm.side) * 0.75; });
+          a.tailSegs.forEach(seg => {
+            const b = seg.userData.base;
+            seg.position.x = b.x + Math.sin(t * 4.6 - b.u * 3.5) * (0.08 + b.u * 0.28);
+          });
+        } else if (id === 'horse') {
+          // Joyful pony trot/gallop + bobbing legs & flowing tail!
+          mesh.position.y = Math.abs(Math.sin(t * 4.6)) * 0.14 + Math.sin(bounceBoost * Math.PI) * 0.34;
+          mesh.rotation.x = Math.sin(t * 4.6) * 0.08;
+          mesh.rotation.y = Math.sin(t * 1.4) * 0.34 + bounceBoost * 1.8;
+          a.legs.forEach(l => { l.pivot.rotation.x = Math.sin(t * 9.2 + l.side * 1.5) * 0.45; });
+          a.tailSegs.forEach(seg => {
+            const b = seg.userData.base;
+            seg.position.x = b.x + Math.sin(t * 6.0 - b.u * 2.5) * (0.05 + b.u * 0.20);
+          });
+        } else if (id === 'goat') {
+          // Playful fluffy lamb hop + beard wiggle!
+          mesh.position.y = Math.abs(Math.sin(t * 3.6)) * 0.14 + Math.sin(bounceBoost * Math.PI) * 0.34;
+          mesh.rotation.y = Math.sin(t * 1.4) * 0.34 + bounceBoost * 1.8;
+          if (a.extras.beard) a.extras.beard.rotation.z = Math.sin(t * 7.5) * 0.18;
+          if (head) head.rotation.z = Math.sin(t * 2.6) * 0.12;
+        } else {
+          // Ox (Sửu): confident head nod + ear flick + tail swish!
+          mesh.position.y = Math.sin(t * 2.4) * 0.07 + Math.sin(bounceBoost * Math.PI) * 0.32;
+          mesh.rotation.y = Math.sin(t * 1.2) * 0.30 + bounceBoost * 1.8;
+          if (head) head.rotation.x = Math.sin(t * 2.8) * 0.12;
+          a.ears.forEach(e => { e.pivot.rotation.z = e.side * Math.sin(t * 4.5) * 0.14; });
+          a.tailSegs.forEach(seg => {
+            const b = seg.userData.base;
+            seg.position.x = b.x + Math.sin(t * 4.2 - b.u * 2.0) * (0.06 + b.u * 0.22);
+          });
+        }
+
         renderer.render(scene, camera);
       }
       rafId = requestAnimationFrame(animate);
