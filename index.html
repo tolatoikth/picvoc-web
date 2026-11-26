@@ -4615,6 +4615,8 @@
 
           this.stop();
           currentT = typeof state.bgTheme.frozenTime === 'number' ? state.bgTheme.frozenTime : currentT;
+          // Draw first frame immediately so there is zero blank flash on page load
+          renderScene(canvas, state.bgTheme.liveScene || 'ocean', currentT);
           lastPerf = performance.now();
           const loop = (now) => {
             if (state.bgTheme.type !== 'live' || state.bgTheme.frozen) {
@@ -9650,7 +9652,13 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
       });
 
       applySidebarState();
-      window.addEventListener('resize', applySidebarState);
+      applyBgTheme();
+      window.addEventListener('resize', () => {
+        applySidebarState();
+        if (state.bgTheme && state.bgTheme.type === 'live' && state.bgTheme.frozen) {
+          liveBgEngine.sync();
+        }
+      });
       // Back-to-top button visibility on scroll
       window.addEventListener('scroll', () => {
         const btt = document.getElementById('btn-back-to-top');
