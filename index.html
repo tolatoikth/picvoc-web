@@ -20,16 +20,16 @@
           fontFamily: { sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'] },
           colors: {
             brand: {
-              50: '#EDEFFF',
-              100: '#DCE0FF',
-              500: '#4255FF',
-              600: '#3545E5',
-              700: '#2937C4'
+              50: '#F5F0FF',
+              100: '#EDE5FF',
+              500: '#7C3AED',
+              600: '#6D28D9',
+              700: '#5B21B6'
             },
             ink: {
-              900: '#0A092D',
-              800: '#1A1D4D',
-              700: '#2E3856'
+              900: '#160A33',
+              800: '#2E1065',
+              700: '#4C1D95'
             }
           }
         }
@@ -39,11 +39,17 @@
   <style>
     body {
       font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-      background-color: #F6F7FB;
-      color: #0A092D;
+      background-color: #F7F5FF;
+      color: #160A33;
       letter-spacing: -0.01em;
       -webkit-tap-highlight-color: transparent;
     }
+    @keyframes float3d {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-7px) rotate(2deg); }
+    }
+    .animate-float3d { animation: float3d 4.2s ease-in-out infinite; }
+    .animate-float3d-slow { animation: float3d 5.6s ease-in-out infinite reverse; }
     h1, h2, h3, h4 { letter-spacing: -0.025em; }
     .perspective-1000 { perspective: 1000px; }
     .preserve-3d { transform-style: preserve-3d; }
@@ -202,7 +208,7 @@
       </main>
 
   <!-- Premium Corporate Footer (Inspired by modern dark navy-emerald layout) -->
-  <footer class="mt-auto bg-gradient-to-br from-[#071525] via-[#0b1f36] to-[#0a2926] text-slate-300 border-t border-slate-800/80 pb-20 md:pb-0">
+  <footer class="mt-auto bg-gradient-to-br from-[#180736] via-[#280F56] to-[#1B0C3E] text-purple-100/80 border-t border-purple-900/60 pb-20 md:pb-0">
     <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-11 pb-8">
       <div class="grid grid-cols-1 md:grid-cols-12 gap-8 pb-9 border-b border-white/10">
         <!-- Col 1: Brand Identity -->
@@ -386,6 +392,17 @@
   <div id="onboarding-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/55 backdrop-blur-xs p-3 sm:p-5">
     <div id="onboarding-modal-card" class="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-5 sm:p-6 animate-pop border border-slate-200 space-y-4"></div>
   </div>
+
+  <!-- Interactive Stats Modal (Learned by Topic / Favorite Topics / 20-Quiz History & Records) -->
+  <div id="stats-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-[#160A33]/60 backdrop-blur-xs p-3 sm:p-5">
+    <div id="stats-modal-card" class="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 animate-pop border-2 border-[#EDE5FF] space-y-4"></div>
+  </div>
+
+  <!-- Back-to-Top Floating Button (UX Convenience) -->
+  <button id="btn-back-to-top" type="button" title="Lên đầu trang"
+    class="hidden fixed bottom-20 md:bottom-6 left-4 z-30 w-10 h-10 rounded-2xl bg-[#6D28D9] hover:bg-[#5B21B6] text-white shadow-lg shadow-purple-900/25 flex items-center justify-center transition-all hover:-translate-y-0.5">
+    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+  </button>
 
   <!-- Dedicated Full-Tab AI Chat Mode (X button exits cleanly back to previous page) -->
   <div id="mascot-chat-panel"
@@ -701,6 +718,7 @@
           accent: state.accent,
           speechRate: state.speechRate,
           bestQuizScore: state.bestQuizScore,
+          quizHistory: state.quizHistory,
           preferredUSVoice: state.preferredUSVoice,
           preferredUKVoice: state.preferredUKVoice,
           useRealDictAudio: state.useRealDictAudio,
@@ -738,6 +756,10 @@
       preferredUSVoice: saved.preferredUSVoice || '',
       preferredUKVoice: saved.preferredUKVoice || '',
       bestQuizScore: typeof saved.bestQuizScore === 'number' ? saved.bestQuizScore : 0,
+      quizHistory: Array.isArray(saved.quizHistory) ? saved.quizHistory.slice(0, 20) : (typeof saved.bestQuizScore === 'number' && saved.bestQuizScore > 0 ? [{ score: saved.bestQuizScore, correct: 0, total: 0, topicName: 'Kỷ lục trước đó', mode: 'Tổng hợp', date: new Date().toISOString() }] : []),
+      quizRecorded: false,
+      statsModalTab: 'learned',
+      statsExpandedTopics: {},
       profile: {
         nickname: (saved.profile && saved.profile.nickname) || '',
         mascot: (saved.profile && saved.profile.mascot) || 'cat',
@@ -1412,12 +1434,12 @@
       document.querySelectorAll('.nav-btn').forEach(btn => {
         const active = !chatState.open && btn.dataset.nav === state.view;
         btn.className = 'nav-btn w-full px-3.5 py-2.5 rounded-xl text-[13.5px] font-bold flex items-center gap-3 whitespace-nowrap transition ' +
-          (active ? 'bg-[#EDEFFF] text-[#4255FF]' : 'text-[#586380] hover:bg-[#F6F7FB] hover:text-[#0A092D]');
+          (active ? 'bg-[#F3EEFF] text-[#6D28D9]' : 'text-[#5B5373] hover:bg-[#F7F5FF] hover:text-[#160A33]');
       });
       const aiNavBtn = document.getElementById('sidebar-ai-btn');
       if (aiNavBtn) {
         aiNavBtn.className = 'w-full px-3.5 py-2.5 rounded-xl text-[13.5px] font-bold flex items-center gap-3 whitespace-nowrap transition ' +
-          (chatState.open ? 'bg-[#EDEFFF] text-[#4255FF]' : 'text-[#586380] hover:bg-[#EDEFFF] hover:text-[#4255FF]');
+          (chatState.open ? 'bg-[#F3EEFF] text-[#6D28D9]' : 'text-[#5B5373] hover:bg-[#F3EEFF] hover:text-[#6D28D9]');
       }
       document.querySelectorAll('.mobile-nav-btn').forEach(btn => {
         const active = btn.dataset.nav === state.view;
@@ -1653,39 +1675,77 @@
 
       return `
         <section class="space-y-6">
-          <!-- Hero Progress Banner -->
-          <div class="bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 rounded-3xl p-5 sm:p-6 text-white shadow-md">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-xs font-semibold mb-2">
-                  <i data-lucide="database" class="w-3.5 h-3.5"></i>
+          <!-- Modern Playful Purple-Gradient Hero Banner with 3D Clay Accents & Clickable Stats -->
+          <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#3B0764] via-[#5B21B6] to-[#7C3AED] p-5 sm:p-7 text-white shadow-xl shadow-purple-950/20 border border-purple-400/20">
+            <!-- Playful Ambient 3D Glow & Floating Clay Shapes -->
+            <div class="pointer-events-none absolute -top-16 -right-12 w-64 h-64 rounded-full bg-[#34F5A5]/15 blur-3xl"></div>
+            <div class="pointer-events-none absolute -bottom-20 left-1/3 w-72 h-72 rounded-full bg-[#F472B6]/15 blur-3xl"></div>
+
+            <!-- Decorative 3D Clay Checkmark & Lightning (Desktop) -->
+            <svg class="hidden lg:block pointer-events-none absolute right-[320px] top-4 w-11 h-11 animate-float3d drop-shadow-xl" viewBox="0 0 64 64" fill="none">
+              <defs>
+                <linearGradient id="clayWhite" x1="0" y1="0" x2="64" y2="64"><stop stop-color="#FFFFFF"/><stop offset="1" stop-color="#DDD6FE"/></linearGradient>
+                <linearGradient id="clayMint" x1="0" y1="0" x2="40" y2="40"><stop stop-color="#4ADE80"/><stop offset="1" stop-color="#16A34A"/></linearGradient>
+              </defs>
+              <rect x="6" y="6" width="52" height="52" rx="18" fill="url(#clayWhite)" transform="rotate(-10 32 32)"/>
+              <path d="M22 33l7 7 15-16" stroke="url(#clayMint)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <svg class="hidden lg:block pointer-events-none absolute right-[290px] bottom-10 w-9 h-9 animate-float3d-slow drop-shadow-lg" viewBox="0 0 64 64" fill="none">
+              <defs><linearGradient id="clayGold" x1="0" y1="0" x2="64" y2="64"><stop stop-color="#FDE047"/><stop offset="1" stop-color="#F59E0B"/></linearGradient></defs>
+              <circle cx="32" cy="32" r="26" fill="url(#clayGold)"/>
+              <path d="m32 16 4.6 9.4 10.4 1.5-7.5 7.3 1.8 10.3L32 39.6l-9.3 4.9 1.8-10.3-7.5-7.3 10.4-1.5L32 16Z" fill="#4C1D95"/>
+            </svg>
+
+            <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+              <div class="space-y-2 max-w-xl">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/12 border border-white/20 text-xs font-bold text-purple-100">
+                  <span class="w-2 h-2 rounded-full bg-[#2EF29B]"></span>
                   <span>${TOPICS.length} chủ đề • ${VOCAB.length} từ vựng sẵn sàng</span>
                 </div>
-                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Học từ vựng trực quan</h1>
-                <p class="text-emerald-50 text-sm mt-1">Ảnh đời thật sống động, phát âm chuẩn US/UK, lưu tiến độ tự động theo từng chủ đề.</p>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight">
+                  <span class="bg-gradient-to-r from-[#34F5A5] via-[#C4B5FD] to-[#FBCFE8] bg-clip-text text-transparent">Học từ vựng trực quan</span>
+                </h1>
+                <p class="text-purple-100/85 text-xs sm:text-sm leading-relaxed">
+                  Ảnh đời thật sống động, phát âm chuẩn US/UK, bấm vào 3 ô thống kê bên cạnh để xem chi tiết từng chủ đề &amp; lịch sử điểm.
+                </p>
               </div>
-              <div class="grid grid-cols-3 gap-2.5 sm:min-w-[260px]">
-                <div class="bg-white/15 backdrop-blur-xs rounded-2xl p-3 text-center">
-                  <div class="text-xl font-extrabold">${totalLearned}/${VOCAB.length}</div>
-                  <div class="text-[11px] text-emerald-100 font-medium">Đã thuộc</div>
-                </div>
-                <div class="bg-white/15 backdrop-blur-xs rounded-2xl p-3 text-center">
-                  <div class="text-xl font-extrabold">${favTopicCount}</div>
-                  <div class="text-[11px] text-emerald-100 font-medium">Chủ đề thích</div>
-                </div>
-                <div class="bg-white/15 backdrop-blur-xs rounded-2xl p-3 text-center">
-                  <div class="text-xl font-extrabold">${state.bestQuizScore}%</div>
-                  <div class="text-[11px] text-emerald-100 font-medium">Điểm cao</div>
-                </div>
+
+              <!-- 3 Interactive Clickable Stat Cards -->
+              <div class="grid grid-cols-3 gap-2.5 sm:min-w-[300px]">
+                <button data-action="open-stats-modal" data-tab="learned" type="button" title="Bấm để xem từ đã thuộc theo từng chủ đề"
+                  class="group bg-white/14 hover:bg-white/22 border border-white/20 hover:border-[#34F5A5]/70 rounded-2xl p-3 text-center transition-all hover:-translate-y-0.5 cursor-pointer">
+                  <div class="text-xl sm:text-2xl font-extrabold text-white">${totalLearned}/${VOCAB.length}</div>
+                  <div class="text-[11px] text-purple-100 font-bold mt-0.5 flex items-center justify-center gap-0.5">
+                    <span>Đã thuộc</span>
+                    <span class="text-[#34F5A5] group-hover:translate-x-0.5 transition">&rsaquo;</span>
+                  </div>
+                </button>
+                <button data-action="open-stats-modal" data-tab="fav-topics" type="button" title="Bấm để xem danh sách chủ đề yêu thích"
+                  class="group bg-white/14 hover:bg-white/22 border border-white/20 hover:border-[#FFCD1F]/70 rounded-2xl p-3 text-center transition-all hover:-translate-y-0.5 cursor-pointer">
+                  <div class="text-xl sm:text-2xl font-extrabold text-[#FFCD1F]">${favTopicCount}</div>
+                  <div class="text-[11px] text-purple-100 font-bold mt-0.5 flex items-center justify-center gap-0.5">
+                    <span>Chủ đề thích</span>
+                    <span class="text-[#FFCD1F] group-hover:translate-x-0.5 transition">&rsaquo;</span>
+                  </div>
+                </button>
+                <button data-action="open-stats-modal" data-tab="quiz-history" type="button" title="Bấm để xem lịch sử 20 bài gần nhất & kỷ lục cao/thấp nhất"
+                  class="group bg-white/14 hover:bg-white/22 border border-white/20 hover:border-[#F472B6]/70 rounded-2xl p-3 text-center transition-all hover:-translate-y-0.5 cursor-pointer">
+                  <div class="text-xl sm:text-2xl font-extrabold text-[#34F5A5]">${getQuizAverageScore()}</div>
+                  <div class="text-[11px] text-purple-100 font-bold mt-0.5 flex items-center justify-center gap-0.5">
+                    <span>TB 20 bài</span>
+                    <span class="text-[#F472B6] group-hover:translate-x-0.5 transition">&rsaquo;</span>
+                  </div>
+                </button>
               </div>
             </div>
-            <div class="mt-4">
-              <div class="flex justify-between text-xs text-emerald-100 mb-1">
-                <span>Tổng tiến độ</span>
-                <span class="font-bold">${totalPct}%</span>
+
+            <div class="relative z-10 mt-5">
+              <div class="flex justify-between text-xs text-purple-100/90 mb-1.5">
+                <span class="font-semibold">Tổng tiến độ chinh phục</span>
+                <span class="font-extrabold text-[#34F5A5]">${totalPct}%</span>
               </div>
-              <div class="w-full h-2 bg-white/20 rounded-full overflow-hidden">
-                <div class="bg-white h-full rounded-full transition-all duration-300" style="width: ${totalPct}%"></div>
+              <div class="w-full h-2.5 bg-black/25 rounded-full overflow-hidden p-0.5">
+                <div class="bg-gradient-to-r from-[#2EF29B] via-[#38BDF8] to-[#F472B6] h-full rounded-full transition-all duration-500" style="width: ${totalPct}%"></div>
               </div>
             </div>
           </div>
@@ -1705,8 +1765,8 @@
             ${searchResultsHtml}
           </div>
 
-          <!-- Quizlet-Inspired Bold Geometric Study Modes Showcase -->
-          <section class="rounded-3xl bg-[#0A092D] p-5 sm:p-6 text-white shadow-lg">
+          <!-- Modern Playful Study Modes Showcase -->
+          <section class="rounded-3xl bg-gradient-to-br from-[#2E1065] via-[#3B0764] to-[#4C1D95] p-5 sm:p-6 text-white shadow-lg border border-purple-400/20">
             <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
               <div>
                 <h2 class="text-base sm:text-lg font-extrabold text-white">Chọn chế độ học hôm nay</h2>
@@ -1828,8 +1888,8 @@
                   <button data-action="set-topic-tab" data-tab="${tab.id}" type="button"
                     class="px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
                       state.topicTab === tab.id
-                        ? 'bg-[#4255FF] text-white shadow-xs'
-                        : 'bg-[#EDEFF4] text-[#586380] hover:bg-[#DFE3EE] hover:text-[#0A092D]'
+                        ? 'bg-gradient-to-r from-[#6D28D9] to-[#7C3AED] text-white shadow-sm'
+                        : 'bg-[#F1ECFF] text-[#5B5373] hover:bg-[#E4DAFF] hover:text-[#2E1065]'
                     }">${tab.label}</button>
                 `).join('')}
               </div>
@@ -2565,6 +2625,7 @@
       state.quizSelectedOption = null;
       state.quizMistakes = [];
       state.quizActive = true;
+      state.quizRecorded = false;
       if (state.quizMode === 'spelling') setupSpellingForCurrent();
       render();
       if (state.quizMode === 'listen2pic' && questions[0]) {
@@ -2672,8 +2733,22 @@
       const total = state.quizQuestions.length;
       if (state.quizIndex >= total) {
         const pct = total ? Math.round((state.quizScore / total) * 100) : 0;
-        if (pct > state.bestQuizScore) {
-          state.bestQuizScore = pct;
+        if (!state.quizRecorded && total > 0) {
+          state.quizRecorded = true;
+          const tName = state.quizTopic === 'all' ? 'Tổng hợp' : getTopicObj(state.quizTopic).name;
+          const modeLabels = { pic2word: 'Nhìn hình đoán từ', listen2pic: 'Nghe chọn hình', spell: 'Ghép chữ' };
+          state.quizHistory = [
+            {
+              score: pct,
+              correct: state.quizScore,
+              total,
+              topicName: tName,
+              mode: modeLabels[state.quizMode] || 'Kiểm tra',
+              date: new Date().toISOString()
+            },
+            ...(Array.isArray(state.quizHistory) ? state.quizHistory : [])
+          ].slice(0, 20);
+          if (pct > state.bestQuizScore) state.bestQuizScore = pct;
           saveState();
         }
         return `
@@ -3040,6 +3115,238 @@
       modal.classList.remove('hidden');
       modal.classList.add('flex');
       if (window.lucide) lucide.createIcons();
+    }
+
+    function getQuizAverageScore() {
+      const hist = Array.isArray(state.quizHistory) ? state.quizHistory.slice(0, 20) : [];
+      if (!hist.length) return 0;
+      const sum = hist.reduce((acc, item) => acc + (Number(item.score) || 0), 0);
+      return Math.round(sum / hist.length);
+    }
+
+    function openStatsModal(tab = 'learned') {
+      state.statsModalTab = tab || 'learned';
+      renderStatsModal();
+      const modal = document.getElementById('stats-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeStatsModal() {
+      const modal = document.getElementById('stats-modal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    function renderStatsModal() {
+      const card = document.getElementById('stats-modal-card');
+      if (!card) return;
+      const tab = state.statsModalTab || 'learned';
+      const hist = Array.isArray(state.quizHistory) ? state.quizHistory.slice(0, 20) : [];
+      const avgScore = getQuizAverageScore();
+      const favTopics = TOPICS.filter(t => getTopicState(t.id).isFavorite);
+
+      // Build Learned-by-Topic list
+      const learnedByTopic = TOPICS.map(t => {
+        const allWords = getWordsByTopic(t.id);
+        const doneWords = allWords.filter(w => state.learned.has(w.id));
+        return { topic: t, allWords, doneWords };
+      }).filter(x => x.doneWords.length > 0);
+
+      let bodyHtml = '';
+      if (tab === 'learned') {
+        if (!learnedByTopic.length) {
+          bodyHtml = `
+            <div class="rounded-2xl bg-[#F7F5FF] border border-[#EDE5FF] p-8 text-center space-y-3">
+              <p class="text-sm font-bold text-[#2E1065]">Bạn chưa đánh dấu thuộc từ nào.</p>
+              <p class="text-xs text-[#5B5373]">Hãy vào mục Học từ vựng hoặc Flashcard và bấm "Đã thuộc" để bắt đầu tích lũy nhé!</p>
+              <button data-action="stats-go-learn" type="button" class="px-5 py-2.5 rounded-xl bg-[#6D28D9] hover:bg-[#5B21B6] text-white text-xs font-extrabold transition">Học ngay</button>
+            </div>
+          `;
+        } else {
+          bodyHtml = `
+            <div class="space-y-4">
+              ${learnedByTopic.map(({ topic: t, allWords, doneWords }) => {
+                const expanded = Boolean(state.statsExpandedTopics[t.id]);
+                const shownWords = expanded ? doneWords : doneWords.slice(0, 10);
+                const remaining = doneWords.length - shownWords.length;
+                const cover = getTopicCoverUrl(t);
+                return `
+                  <div class="rounded-2xl border-2 border-[#EDE5FF] bg-white overflow-hidden shadow-2xs">
+                    <!-- Topic Header Row (clickable to expand/collapse) -->
+                    <div data-action="stats-toggle-topic" data-topic="${escapeAttr(t.id)}"
+                      class="p-3.5 bg-[#F9F7FF] hover:bg-[#F3EEFF] border-b border-[#EDE5FF] flex items-center justify-between gap-3 cursor-pointer transition">
+                      <div class="flex items-center gap-3 min-w-0">
+                        ${cover ? `<img src="${escapeAttr(cover)}" alt="${escapeAttr(t.name)}" class="w-14 h-10 rounded-xl object-cover shrink-0 border border-purple-100" />` : ''}
+                        <div class="min-w-0">
+                          <div class="flex items-center gap-2 flex-wrap">
+                            <span class="font-extrabold text-sm text-[#160A33]">${escapeHtml(t.name)}</span>
+                            <span class="px-2 py-0.5 rounded-full bg-[#6D28D9] text-white text-[11px] font-extrabold">${doneWords.length}/${allWords.length}</span>
+                          </div>
+                          <div class="text-xs text-[#6D28D9] font-semibold truncate">${escapeHtml(t.viName)}</div>
+                        </div>
+                      </div>
+                      <button data-action="stats-open-topic" data-topic="${escapeAttr(t.id)}" type="button"
+                        class="px-3 py-1.5 rounded-xl bg-white hover:bg-[#EDE5FF] border border-[#DDD6FE] text-[#5B21B6] text-[11px] font-extrabold shrink-0 transition">
+                        Vào học &rsaquo;
+                      </button>
+                    </div>
+
+                    <!-- Up to 10 Learned Words Grid (click any word to open detail) -->
+                    <div class="p-3.5 space-y-2.5">
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        ${shownWords.map(w => `
+                          <button data-action="stats-open-word" data-id="${escapeAttr(w.id)}" type="button"
+                            class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#F7F5FF] hover:bg-[#EDE5FF] border border-transparent hover:border-[#C4B5FD] text-left transition">
+                            <div class="min-w-0">
+                              <div class="text-xs font-extrabold text-[#160A33] truncate">${escapeHtml(w.word)}</div>
+                              <div class="text-[11px] text-[#5B5373] truncate">${escapeHtml(w.vi)}</div>
+                            </div>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white text-[#6D28D9] border border-[#EDE5FF] shrink-0">${escapeHtml(w.level || 'B1')}</span>
+                          </button>
+                        `).join('')}
+                      </div>
+                      ${doneWords.length > 10 ? `
+                        <button data-action="stats-toggle-topic" data-topic="${escapeAttr(t.id)}" type="button"
+                          class="w-full py-2 rounded-xl bg-[#F3EEFF] hover:bg-[#E4DAFF] text-[#5B21B6] text-xs font-extrabold transition">
+                          ${expanded ? 'Thu gọn danh sách (chỉ hiện 10 từ)' : `Xem thêm ${remaining} từ đã thuộc khác`}
+                        </button>
+                      ` : ''}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+      } else if (tab === 'fav-topics') {
+        if (!favTopics.length) {
+          bodyHtml = `
+            <div class="rounded-2xl bg-[#F7F5FF] border border-[#EDE5FF] p-8 text-center space-y-2">
+              <p class="text-sm font-bold text-[#2E1065]">Bạn chưa đánh dấu sao chủ đề nào.</p>
+              <p class="text-xs text-[#5B5373]">Bấm biểu tượng ngôi sao ở góc trên mỗi thẻ chủ đề để lưu vào đây nhé!</p>
+            </div>
+          `;
+        } else {
+          bodyHtml = `
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              ${favTopics.map(t => {
+                const prog = getTopicProgress(t.id);
+                const cover = getTopicCoverUrl(t);
+                return `
+                  <div class="rounded-2xl border-2 border-[#EDE5FF] bg-white overflow-hidden flex flex-col">
+                    ${cover ? `<div class="h-28 w-full overflow-hidden bg-purple-50"><img src="${escapeAttr(cover)}" alt="${escapeAttr(t.name)}" class="w-full h-full object-cover" /></div>` : ''}
+                    <div class="p-3.5 flex-1 flex flex-col justify-between gap-3">
+                      <div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="font-extrabold text-sm text-[#160A33] truncate">${escapeHtml(t.name)}</span>
+                          <span class="px-2 py-0.5 rounded-full bg-[#F3EEFF] text-[#6D28D9] text-[11px] font-extrabold shrink-0">${prog.done}/${prog.total}</span>
+                        </div>
+                        <div class="text-xs text-[#6D28D9] font-semibold mt-0.5">${escapeHtml(t.viName)}</div>
+                        <div class="w-full h-1.5 bg-[#F1ECFF] rounded-full overflow-hidden mt-2">
+                          <div class="bg-[#6D28D9] h-full rounded-full" style="width: ${prog.pct}%"></div>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <button data-action="stats-open-topic" data-topic="${escapeAttr(t.id)}" type="button"
+                          class="flex-1 py-2 rounded-xl bg-[#6D28D9] hover:bg-[#5B21B6] text-white text-xs font-extrabold transition">Học từ</button>
+                        <button data-action="stats-unfav-topic" data-topic="${escapeAttr(t.id)}" type="button"
+                          class="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold transition">Bỏ thích</button>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }
+      } else {
+        // Quiz History (20 recent tests + Highest & Lowest Records, NO % sign)
+        const maxRec = hist.length ? hist.reduce((a, b) => (b.score > a.score ? b : a), hist[0]) : null;
+        const minRec = hist.length ? hist.reduce((a, b) => (b.score < a.score ? b : a), hist[0]) : null;
+        bodyHtml = `
+          <div class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="rounded-2xl bg-gradient-to-br from-[#5B21B6] to-[#7C3AED] text-white p-4 text-center shadow-sm">
+                <div class="text-[11px] font-bold text-purple-100 uppercase tracking-wider">TB ${hist.length}/20 bài gần nhất</div>
+                <div class="text-3xl font-extrabold text-[#34F5A5] mt-1">${avgScore}</div>
+                <div class="text-[11px] text-purple-200 mt-0.5">Thang điểm 100</div>
+              </div>
+              <div class="rounded-2xl bg-emerald-50 border-2 border-emerald-200 p-4 text-center">
+                <div class="text-[11px] font-extrabold text-emerald-700 uppercase tracking-wider">Kỷ lục cao nhất</div>
+                <div class="text-3xl font-extrabold text-emerald-700 mt-1">${maxRec ? maxRec.score : 0}</div>
+                <div class="text-[11px] text-emerald-700/80 font-semibold truncate mt-0.5">${maxRec ? escapeHtml(maxRec.topicName) : 'Chưa có bài thi'}</div>
+              </div>
+              <div class="rounded-2xl bg-rose-50 border-2 border-rose-200 p-4 text-center">
+                <div class="text-[11px] font-extrabold text-rose-700 uppercase tracking-wider">Điểm thấp nhất</div>
+                <div class="text-3xl font-extrabold text-rose-600 mt-1">${minRec ? minRec.score : 0}</div>
+                <div class="text-[11px] text-rose-700/80 font-semibold truncate mt-0.5">${minRec ? escapeHtml(minRec.topicName) : 'Chưa có bài thi'}</div>
+              </div>
+            </div>
+
+            ${hist.length ? `
+              <div class="space-y-2">
+                <div class="text-xs font-extrabold text-[#5B5373] uppercase tracking-wider">Lịch sử ${hist.length} bài kiểm tra gần nhất</div>
+                ${hist.map((item, idx) => {
+                  const d = item.date ? new Date(item.date).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+                  const badgeCls = item.score >= 80 ? 'bg-emerald-100 text-emerald-800' : item.score >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700';
+                  return `
+                    <div class="flex items-center justify-between gap-3 p-3 rounded-2xl bg-[#F7F5FF] border border-[#EDE5FF]">
+                      <div class="flex items-center gap-3 min-w-0">
+                        <span class="w-7 h-7 rounded-xl bg-white border border-[#DDD6FE] text-[11px] font-extrabold text-[#5B21B6] flex items-center justify-center shrink-0">#${idx + 1}</span>
+                        <div class="min-w-0">
+                          <div class="text-xs font-extrabold text-[#160A33] truncate">${escapeHtml(item.topicName || 'Tổng hợp')} · <span class="font-semibold text-[#6D28D9]">${escapeHtml(item.mode || 'Kiểm tra')}</span></div>
+                          <div class="text-[11px] text-[#5B5373]">${item.total ? `Đúng ${item.correct}/${item.total} câu` : 'Điểm ghi nhận'}${d ? ` · ${d}` : ''}</div>
+                        </div>
+                      </div>
+                      <span class="px-3 py-1 rounded-xl text-sm font-extrabold ${badgeCls} shrink-0">${item.score}</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            ` : `
+              <div class="rounded-2xl bg-[#F7F5FF] border border-[#EDE5FF] p-8 text-center space-y-3">
+                <p class="text-sm font-bold text-[#2E1065]">Chưa có lịch sử bài kiểm tra nào.</p>
+                <button data-action="stats-go-quiz" type="button" class="px-5 py-2.5 rounded-xl bg-[#6D28D9] hover:bg-[#5B21B6] text-white text-xs font-extrabold transition">Làm bài kiểm tra ngay</button>
+              </div>
+            `}
+          </div>
+        `;
+      }
+
+      card.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h3 class="text-lg font-extrabold text-[#160A33]">Thống kê học tập KaDoc</h3>
+            <p class="text-xs text-[#5B5373]">Theo dõi chi tiết từ đã thuộc, chủ đề yêu thích và phong độ 20 bài gần nhất</p>
+          </div>
+          <button data-action="close-stats-modal" type="button" class="w-9 h-9 rounded-xl bg-[#F3EEFF] hover:bg-[#E4DAFF] text-[#5B21B6] flex items-center justify-center transition">
+            <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+          <button data-action="open-stats-modal" data-tab="learned" type="button"
+            class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${tab === 'learned' ? 'bg-[#6D28D9] text-white shadow-xs' : 'bg-[#F3EEFF] text-[#5B5373] hover:bg-[#E4DAFF]'}">
+            Từ đã thuộc (${state.learned.size})
+          </button>
+          <button data-action="open-stats-modal" data-tab="fav-topics" type="button"
+            class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${tab === 'fav-topics' ? 'bg-[#6D28D9] text-white shadow-xs' : 'bg-[#F3EEFF] text-[#5B5373] hover:bg-[#E4DAFF]'}">
+            Chủ đề thích (${favTopics.length})
+          </button>
+          <button data-action="open-stats-modal" data-tab="quiz-history" type="button"
+            class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${tab === 'quiz-history' ? 'bg-[#6D28D9] text-white shadow-xs' : 'bg-[#F3EEFF] text-[#5B5373] hover:bg-[#E4DAFF]'}">
+            Lịch sử 20 bài (TB: ${avgScore})
+          </button>
+        </div>
+
+        <div>${bodyHtml}</div>
+      `;
     }
 
     function openVoiceModal() {
@@ -3508,6 +3815,8 @@
 
       if (e.target === document.getElementById('word-modal')) { closeModal(); return; }
       if (e.target === document.getElementById('voice-modal')) { closeVoiceModal(); return; }
+      if (e.target === document.getElementById('stats-modal')) { closeStatsModal(); return; }
+      if (e.target.closest('#btn-back-to-top')) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
       if (e.target === document.getElementById('auth-modal')) { closeAuthModal(); return; }
 
       const actEl = e.target.closest('[data-action]');
@@ -3563,6 +3872,38 @@
         return;
       }
       if (action === 'close-voice-modal') { closeVoiceModal(); return; }
+      if (action === 'close-stats-modal') { closeStatsModal(); return; }
+      if (action === 'open-stats-modal') { openStatsModal(actEl.dataset.tab || 'learned'); return; }
+      if (action === 'stats-toggle-topic') {
+        const tid = actEl.dataset.topic;
+        if (tid) {
+          state.statsExpandedTopics[tid] = !state.statsExpandedTopics[tid];
+          renderStatsModal();
+        }
+        return;
+      }
+      if (action === 'stats-open-topic') {
+        const tid = actEl.dataset.topic;
+        closeStatsModal();
+        if (tid) setView('learn', { topic: tid });
+        return;
+      }
+      if (action === 'stats-open-word') {
+        const wid = actEl.dataset.id;
+        closeStatsModal();
+        if (wid) openModal(wid);
+        return;
+      }
+      if (action === 'stats-unfav-topic') {
+        const tid = actEl.dataset.topic;
+        if (tid) {
+          toggleFavoriteTopic(tid);
+          renderStatsModal();
+        }
+        return;
+      }
+      if (action === 'stats-go-learn') { closeStatsModal(); setView('learn'); return; }
+      if (action === 'stats-go-quiz') { closeStatsModal(); setView('quiz'); return; }
       if (action === 'close-auth-modal') { closeAuthModal(); return; }
       if (action === 'set-auth-mode') {
         state.authMode = actEl.dataset.mode === 'signup' ? 'signup' : 'login';
@@ -6049,6 +6390,47 @@ Now let's keep going! Which **lecture** or subject do you enjoy the most at scho
 
       applySidebarState();
       window.addEventListener('resize', applySidebarState);
+      // Back-to-top button visibility on scroll
+      window.addEventListener('scroll', () => {
+        const btt = document.getElementById('btn-back-to-top');
+        if (btt) btt.classList.toggle('hidden', window.scrollY < 380);
+      }, { passive: true });
+      // Smart Keyboard Shortcuts: Esc closes modals/AI; Space/Arrows/Enter control Flashcards!
+      document.addEventListener('keydown', (ev) => {
+        const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+        const typing = tag === 'input' || tag === 'textarea' || tag === 'select';
+        if (ev.key === 'Escape') {
+          if (chatState.open) { closeMascotChat(); return; }
+          closeStatsModal();
+          closeModal();
+          closeVoiceModal();
+          closeAuthModal();
+          closePetActionMenu();
+          return;
+        }
+        if (typing || chatState.open) return;
+        if (state.view === 'flashcard' && state.fcDeck && state.fcDeck.length) {
+          if (ev.code === 'Space') {
+            ev.preventDefault();
+            state.fcFlipped = !state.fcFlipped;
+            render();
+          } else if (ev.key === 'ArrowRight') {
+            ev.preventDefault();
+            state.fcIndex = (state.fcIndex + 1) % state.fcDeck.length;
+            state.fcFlipped = false;
+            render();
+          } else if (ev.key === 'ArrowLeft') {
+            ev.preventDefault();
+            state.fcIndex = (state.fcIndex - 1 + state.fcDeck.length) % state.fcDeck.length;
+            state.fcFlipped = false;
+            render();
+          } else if (ev.key === 'Enter') {
+            ev.preventDefault();
+            const cur = state.fcDeck[state.fcIndex];
+            if (cur) toggleLearned(cur.id);
+          }
+        }
+      });
       initFloatingMascot();
       applyMascotVisibilityAndPosition();
       initMascotDrag();
