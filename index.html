@@ -50,6 +50,52 @@
     }
     .animate-float3d { animation: float3d 4.2s ease-in-out infinite; }
     .animate-float3d-slow { animation: float3d 5.6s ease-in-out infinite reverse; }
+    .hue-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 14px;
+      border-radius: 9999px;
+      background: linear-gradient(to right, #f43f5e 0%, #f59e0b 17%, #eab308 28%, #22c55e 42%, #06b6d4 56%, #3b82f6 69%, #8b5cf6 82%, #ec4899 94%, #f43f5e 100%);
+      outline: none;
+      cursor: pointer;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .hue-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #6D28D9;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.28);
+      cursor: grab;
+    }
+    .hue-slider::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #6D28D9;
+      box-shadow: 0 2px 8px rgba(15,23,42,0.28);
+      cursor: grab;
+    }
+    body.bg-mode-dark h2.text-slate-900,
+    body.bg-mode-dark .text-slate-900.dark-adapt { color: #F5F3FF !important; }
+    @keyframes matchShake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px) rotate(-1.5deg); }
+      40% { transform: translateX(6px) rotate(1.5deg); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+    .animate-match-shake { animation: matchShake 0.34s ease-in-out; }
+    @keyframes matchBurst {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.9; }
+      100% { transform: scale(0.75); opacity: 0; }
+    }
+    .animate-match-burst { animation: matchBurst 0.32s ease-out forwards; }
     h1, h2, h3, h4 { letter-spacing: -0.025em; }
     .perspective-1000 { perspective: 1000px; }
     .preserve-3d { transform-style: preserve-3d; }
@@ -167,6 +213,16 @@
 
         <div class="border-t border-slate-200/80 pt-4 space-y-1.5">
           <div class="px-3.5 pb-1 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Bắt đầu tại đây</div>
+          <button data-nav="games" type="button" class="nav-btn w-full px-3.5 py-2.5 rounded-xl text-[13.5px] font-bold flex items-center gap-3 whitespace-nowrap transition">
+            <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
+              <rect x="2.5" y="6.5" width="19" height="12" rx="5" fill="currentColor" opacity="0.2" stroke="currentColor" stroke-width="2"/>
+              <path d="M8 10.5v4M6 12.5h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="15.5" cy="11.5" r="1.2" fill="currentColor"/>
+              <circle cx="17.8" cy="13.5" r="1.2" fill="currentColor"/>
+            </svg>
+            <span>Trò chơi</span>
+            <span class="ml-auto px-1.5 py-0.5 rounded-md bg-[#2EF29B] text-[#160A33] text-[9px] font-black uppercase">Mới</span>
+          </button>
           <button data-nav="quiz" type="button" class="nav-btn w-full px-3.5 py-2.5 rounded-xl text-[13.5px] font-bold flex items-center gap-3 whitespace-nowrap transition">
             <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
               <rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor" opacity="0.18"/>
@@ -719,6 +775,8 @@
           speechRate: state.speechRate,
           bestQuizScore: state.bestQuizScore,
           quizHistory: state.quizHistory,
+          bgTheme: state.bgTheme,
+          matchBestTimes: state.matchBestTimes,
           preferredUSVoice: state.preferredUSVoice,
           preferredUKVoice: state.preferredUKVoice,
           useRealDictAudio: state.useRealDictAudio,
@@ -760,6 +818,8 @@
       quizRecorded: false,
       statsModalTab: 'learned',
       statsExpandedTopics: {},
+      bgTheme: (saved.bgTheme && saved.bgTheme.mode) ? saved.bgTheme : { mode: 'soft', hue: 258 },
+      matchBestTimes: (saved.matchBestTimes && typeof saved.matchBestTimes === 'object') ? saved.matchBestTimes : {},
       profile: {
         nickname: (saved.profile && saved.profile.nickname) || '',
         mascot: (saved.profile && saved.profile.mascot) || 'cat',
@@ -1427,6 +1487,7 @@
     function toggleSidebar(forceState) {
       state.sidebarOpen = (typeof forceState === 'boolean') ? forceState : !state.sidebarOpen;
       saveState();
+      applyBgTheme();
       applySidebarState();
     }
 
@@ -3371,6 +3432,46 @@
           </button>
         </div>
 
+        <!-- Section 0: Background Tone & Spectrum Customizer -->
+        <div class="p-3.5 rounded-2xl bg-[#F7F5FF] border border-[#EDE5FF] space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-[11px] font-extrabold text-[#5B21B6] uppercase tracking-wider flex items-center gap-1.5">
+              <i data-lucide="palette" class="w-3.5 h-3.5"></i>
+              <span>Màu nền &amp; Quang phổ dịu mắt</span>
+            </div>
+            <button data-action="reset-bg-theme" type="button" class="text-[11px] font-bold text-[#6D28D9] hover:underline">Mặc định</button>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            ${[
+              { id: 'soft', label: 'Sáng dịu', desc: 'Pastel nhẹ mắt' },
+              { id: 'warm', label: 'Kem ấm', desc: 'Giấy đọc sách' },
+              { id: 'dark', label: 'Tối dịu', desc: 'Chống chói đêm' }
+            ].map(band => `
+              <button data-action="set-bg-mode" data-mode="${band.id}" type="button"
+                class="p-2 rounded-xl border-2 text-left transition ${
+                  state.bgTheme.mode === band.id
+                    ? 'border-[#6D28D9] bg-white shadow-xs'
+                    : 'border-transparent bg-white/70 hover:bg-white'
+                }">
+                <div class="text-xs font-extrabold text-[#160A33]">${band.label}</div>
+                <div class="text-[10px] text-[#5B5373]">${band.desc}</div>
+              </button>
+            `).join('')}
+          </div>
+
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="font-bold text-[#5B5373]">Quang phổ sắc độ nền</span>
+              <span id="bg-hue-badge" class="inline-flex items-center gap-1.5 font-extrabold text-[#160A33]">
+                <span id="bg-hue-swatch" class="w-3.5 h-3.5 rounded-full border border-slate-300 inline-block" style="background:${computeBgColorFromTheme(state.bgTheme)}"></span>
+                <span>${state.bgTheme.hue}&deg;</span>
+              </span>
+            </div>
+            <input id="inp-bg-hue" type="range" min="0" max="360" value="${state.bgTheme.hue}" class="w-full hue-slider" />
+          </div>
+        </div>
+
         <!-- Section 1: 3D Mascot & Profile -->
         <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
           <div class="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
@@ -3461,6 +3562,21 @@
       modal.classList.add('flex');
       if (window.lucide) lucide.createIcons();
 
+      const hueInput = document.getElementById('inp-bg-hue');
+      if (hueInput) {
+        hueInput.addEventListener('input', (e) => {
+          state.bgTheme.hue = Number(e.target.value) || 0;
+          applyBgTheme();
+          saveState();
+          const sw = document.getElementById('bg-hue-swatch');
+          if (sw) sw.style.background = computeBgColorFromTheme(state.bgTheme);
+          const bd = document.getElementById('bg-hue-badge');
+          if (bd) {
+            const sp = bd.querySelectorAll('span')[1];
+            if (sp) sp.textContent = state.bgTheme.hue + '°';
+          }
+        });
+      }
       const chkMascot = document.getElementById('chk-show-mascot');
       if (chkMascot) {
         chkMascot.addEventListener('change', (e) => {
@@ -3723,6 +3839,630 @@
       return escapeHtml(str).replace(/'/g, '&#39;');
     }
 
+    // =========================================================
+    // 5B. BACKGROUND TONE & SPECTRUM ENGINE + KADOC MATCH PRO
+    // =========================================================
+    function computeBgColorFromTheme(theme) {
+      const mode = (theme && theme.mode) || 'soft';
+      const hue = (theme && typeof theme.hue === 'number') ? theme.hue : 258;
+      if (mode === 'warm') {
+        // Warm paper palette gently tinted by spectrum hue
+        const blendedHue = Math.round((hue * 0.25) + 34);
+        return `hsl(${blendedHue}, 52%, 93%)`;
+      }
+      if (mode === 'dark') {
+        return `hsl(${hue}, 38%, 11%)`;
+      }
+      return `hsl(${hue}, 64%, 95%)`;
+    }
+
+    function applyBgTheme() {
+      const bg = computeBgColorFromTheme(state.bgTheme);
+      document.body.style.backgroundColor = bg;
+      document.body.classList.toggle('bg-mode-dark', state.bgTheme.mode === 'dark');
+    }
+
+    // Subtle Web Audio API synthesizer for satisfying Match game sound effects
+    const gameSfx = (function() {
+      let ctx = null;
+      function getCtx() {
+        if (!ctx && (window.AudioContext || window.webkitAudioContext)) {
+          ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        return ctx;
+      }
+      function tone(freq, dur, type = 'sine', gainVal = 0.08, delay = 0) {
+        if (!matchState.soundOn) return;
+        try {
+          const c = getCtx();
+          if (!c) return;
+          if (c.state === 'suspended') c.resume();
+          const osc = c.createOscillator();
+          const g = c.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, c.currentTime + delay);
+          g.gain.setValueAtTime(gainVal, c.currentTime + delay);
+          g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + delay + dur);
+          osc.connect(g);
+          g.connect(c.destination);
+          osc.start(c.currentTime + delay);
+          osc.stop(c.currentTime + delay + dur);
+        } catch (e) {}
+      }
+      return {
+        pick() { tone(520, 0.06, 'sine', 0.05); },
+        match(combo) {
+          const base = 520 + Math.min(combo, 8) * 55;
+          tone(base, 0.11, 'triangle', 0.09, 0);
+          tone(base * 1.25, 0.16, 'triangle', 0.09, 0.07);
+        },
+        wrong() {
+          tone(190, 0.16, 'sawtooth', 0.06, 0);
+          tone(150, 0.18, 'sawtooth', 0.05, 0.08);
+        },
+        win() {
+          [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.22, 'triangle', 0.10, i * 0.09));
+        }
+      };
+    })();
+
+    const matchState = {
+      screen: 'hub',          // hub | setup | play | win
+      selectedTopics: ['education'],
+      wordFilter: 'all',      // all | unlearned | custom
+      customWordIds: new Set(),
+      customSearch: '',
+      pairCount: 8,           // 6 | 8 | 10 | 12
+      matchMode: 'en-vi',     // en-vi | en-img | audio-vi
+      soundOn: true,
+      cards: [],
+      selectedIds: [],
+      wrongIds: [],
+      matchedPairIds: new Set(),
+      locked: false,
+      startTime: 0,
+      elapsedMs: 0,
+      penaltyMs: 0,
+      timerId: null,
+      combo: 0,
+      maxCombo: 0,
+      mistakes: 0,
+      isNewRecord: false
+    };
+
+    function stopMatchTimer() {
+      if (matchState.timerId) {
+        clearInterval(matchState.timerId);
+        matchState.timerId = null;
+      }
+    }
+
+    function getMatchCandidateWords() {
+      const topics = matchState.selectedTopics.length ? matchState.selectedTopics : ['education'];
+      let pool = VOCAB.filter(w => topics.includes(w.topic));
+      if (matchState.wordFilter === 'unlearned') {
+        const un = pool.filter(w => !state.learned.has(w.id));
+        if (un.length >= 2) pool = un;
+      } else if (matchState.wordFilter === 'custom') {
+        pool = pool.filter(w => matchState.customWordIds.has(w.id));
+      }
+      if (matchState.matchMode === 'en-img') {
+        const withImg = pool.filter(w => Boolean(w.image));
+        if (withImg.length >= 2) pool = withImg;
+      }
+      return pool;
+    }
+
+    function startMatchGame() {
+      stopMatchTimer();
+      let pool = getMatchCandidateWords();
+      if (pool.length < 3) {
+        showToast('Cần ít nhất 3 từ vựng để bắt đầu ghép thẻ! Hãy chọn thêm chủ đề hoặc từ.');
+        return;
+      }
+      const count = Math.min(matchState.pairCount, pool.length);
+      const chosen = [...pool].sort(() => Math.random() - 0.5).slice(0, count);
+
+      const cards = [];
+      chosen.forEach(w => {
+        if (matchState.matchMode === 'en-img') {
+          cards.push({ uid: w.id + '_a', pairId: w.id, side: 'a', kind: 'en', text: w.word, sub: w.ipaUS || w.pos, wordObj: w });
+          cards.push({ uid: w.id + '_b', pairId: w.id, side: 'b', kind: 'img', image: w.image, text: w.vi, wordObj: w });
+        } else if (matchState.matchMode === 'audio-vi') {
+          cards.push({ uid: w.id + '_a', pairId: w.id, side: 'a', kind: 'audio', text: 'Nghe phát âm', sub: w.pos, wordObj: w });
+          cards.push({ uid: w.id + '_b', pairId: w.id, side: 'b', kind: 'vi', text: w.vi, wordObj: w });
+        } else {
+          cards.push({ uid: w.id + '_a', pairId: w.id, side: 'a', kind: 'en', text: w.word, sub: w.pos, wordObj: w });
+          cards.push({ uid: w.id + '_b', pairId: w.id, side: 'b', kind: 'vi', text: w.vi, wordObj: w });
+        }
+      });
+
+      // Fisher-Yates shuffle
+      for (let i = cards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [cards[i], cards[j]] = [cards[j], cards[i]];
+      }
+
+      matchState.cards = cards;
+      matchState.selectedIds = [];
+      matchState.wrongIds = [];
+      matchState.matchedPairIds = new Set();
+      matchState.locked = false;
+      matchState.combo = 0;
+      matchState.maxCombo = 0;
+      matchState.mistakes = 0;
+      matchState.penaltyMs = 0;
+      matchState.isNewRecord = false;
+      matchState.startTime = performance.now();
+      matchState.elapsedMs = 0;
+      matchState.screen = 'play';
+
+      matchState.timerId = setInterval(() => {
+        if (matchState.screen !== 'play' || state.view !== 'games') {
+          stopMatchTimer();
+          return;
+        }
+        matchState.elapsedMs = (performance.now() - matchState.startTime) + matchState.penaltyMs;
+        const el = document.getElementById('match-live-timer');
+        if (el) el.textContent = (matchState.elapsedMs / 1000).toFixed(1) + 's';
+      }, 100);
+
+      render();
+    }
+
+    function handleMatchCardClick(uid) {
+      if (matchState.locked || matchState.screen !== 'play') return;
+      const card = matchState.cards.find(c => c.uid === uid);
+      if (!card || matchState.matchedPairIds.has(card.pairId)) return;
+
+      // Toggle deselect if clicking same card
+      if (matchState.selectedIds.includes(uid)) {
+        matchState.selectedIds = [];
+        render();
+        return;
+      }
+
+      if (card.kind === 'en' || card.kind === 'audio') {
+        speakWord(card.wordObj.word);
+      }
+      gameSfx.pick();
+
+      matchState.selectedIds.push(uid);
+      if (matchState.selectedIds.length < 2) {
+        render();
+        return;
+      }
+
+      // Check pair
+      const [id1, id2] = matchState.selectedIds;
+      const c1 = matchState.cards.find(c => c.uid === id1);
+      const c2 = matchState.cards.find(c => c.uid === id2);
+      if (c1 && c2 && c1.pairId === c2.pairId && c1.side !== c2.side) {
+        // MATCH!
+        matchState.combo += 1;
+        if (matchState.combo > matchState.maxCombo) matchState.maxCombo = matchState.combo;
+        gameSfx.match(matchState.combo);
+        matchState.matchedPairIds.add(c1.pairId);
+        matchState.selectedIds = [];
+
+        const totalPairs = matchState.cards.length / 2;
+        if (matchState.matchedPairIds.size >= totalPairs) {
+          stopMatchTimer();
+          matchState.elapsedMs = (performance.now() - matchState.startTime) + matchState.penaltyMs;
+          const sec = Number((matchState.elapsedMs / 1000).toFixed(1));
+          const key = `${totalPairs}_${matchState.matchMode}`;
+          const prevBest = state.matchBestTimes[key];
+          if (!prevBest || sec < prevBest) {
+            state.matchBestTimes[key] = sec;
+            matchState.isNewRecord = true;
+            saveState();
+          }
+          gameSfx.win();
+          setTimeout(() => {
+            matchState.screen = 'win';
+            render();
+          }, 340);
+        }
+        render();
+      } else {
+        // MISMATCH (+1.5s penalty)
+        matchState.locked = true;
+        matchState.combo = 0;
+        matchState.mistakes += 1;
+        matchState.penaltyMs += 1500;
+        matchState.wrongIds = [id1, id2];
+        gameSfx.wrong();
+        render();
+        setTimeout(() => {
+          matchState.wrongIds = [];
+          matchState.selectedIds = [];
+          matchState.locked = false;
+          render();
+        }, 420);
+      }
+    }
+
+    function renderGamesView() {
+      if (matchState.screen === 'setup') return renderMatchSetup();
+      if (matchState.screen === 'play') return renderMatchPlay();
+      if (matchState.screen === 'win') return renderMatchWin();
+
+      // Games Hub (Modern Playful 3-Game Showcase)
+      const best8 = state.matchBestTimes['8_en-vi'];
+      return `
+        <section class="space-y-6">
+          <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#3B0764] via-[#5B21B6] to-[#7C3AED] p-6 sm:p-7 text-white shadow-xl border border-purple-400/20">
+            <div class="pointer-events-none absolute -top-12 -right-12 w-56 h-56 rounded-full bg-[#34F5A5]/20 blur-3xl"></div>
+            <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-[11px] font-extrabold text-[#34F5A5] uppercase tracking-wider mb-2">
+                  KaDoc Arcade · Modern Playful
+                </span>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Trung tâm Trò chơi Từ vựng</h1>
+                <p class="text-purple-100/85 text-xs sm:text-sm mt-1">Vừa chơi vừa ghi nhớ phản xạ nhanh — tự chọn chủ đề, số thẻ và phá kỷ lục của chính bạn.</p>
+              </div>
+              ${best8 ? `
+                <div class="bg-white/15 border border-white/20 rounded-2xl px-4 py-3 text-center shrink-0">
+                  <div class="text-[10px] font-bold uppercase text-purple-200">Kỷ lục Match (8 cặp)</div>
+                  <div class="text-2xl font-extrabold text-[#FFCD1F]">${best8}s</div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Game #1: KaDoc Match Pro (LIVE!) -->
+            <div class="rounded-3xl bg-white border-2 border-[#DDD6FE] shadow-md overflow-hidden flex flex-col card-hover">
+              <div class="aspect-[16/9] bg-gradient-to-br from-[#2E1065] via-[#4C1D95] to-[#6D28D9] p-4 flex items-center justify-center relative overflow-hidden">
+                <div class="grid grid-cols-3 gap-2 w-full max-w-[230px] -rotate-2">
+                  <div class="h-12 rounded-xl bg-white text-[#2E1065] text-[10px] font-extrabold flex items-center justify-center shadow">School</div>
+                  <div class="h-12 rounded-xl bg-[#2EF29B] text-[#160A33] text-[10px] font-black flex items-center justify-center shadow-lg scale-105">Trường học</div>
+                  <div class="h-12 rounded-xl bg-white/90 text-[#2E1065] text-[10px] font-extrabold flex items-center justify-center shadow">Polite</div>
+                  <div class="h-12 rounded-xl bg-[#F472B6] text-white text-[10px] font-black flex items-center justify-center shadow">Lịch sự</div>
+                  <div class="h-12 rounded-xl bg-white/85 text-[#2E1065] text-[10px] font-extrabold flex items-center justify-center shadow">Exam</div>
+                  <div class="h-12 rounded-xl bg-[#FFCD1F] text-[#160A33] text-[10px] font-black flex items-center justify-center shadow">Kỳ thi</div>
+                </div>
+                <span class="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-[#2EF29B] text-[#160A33] text-[10px] font-black uppercase">Đợt 1 · Chơi ngay</span>
+              </div>
+              <div class="p-5 flex-1 flex flex-col justify-between gap-4">
+                <div>
+                  <h3 class="text-lg font-extrabold text-[#160A33]">Ghép thẻ tính giờ</h3>
+                  <p class="text-xs text-[#5B5373] mt-1 leading-relaxed">Chọn nhiều chủ đề hoặc tự lọc từ, ghép cặp tốc độ với hiệu ứng combo, âm thanh vui tai và bảng kỷ lục thời gian.</p>
+                </div>
+                <button data-action="match-open-setup" type="button"
+                  class="btn-tactile w-full py-3 rounded-2xl bg-[#2EF29B] hover:bg-[#1EE08A] border-[#10B981] text-[#160A33] font-extrabold text-sm flex items-center justify-center gap-2">
+                  <span>Chơi Ghép thẻ ngay</span>
+                  <span>&rarr;</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Game #2: KaDoc Blast (Đợt 2) -->
+            <div class="rounded-3xl bg-white border-2 border-[#EDE5FF] shadow-xs overflow-hidden flex flex-col opacity-90">
+              <div class="aspect-[16/9] bg-gradient-to-br from-[#0F172A] via-[#1E1B4B] to-[#312E81] p-4 flex items-center justify-center relative">
+                <div class="flex items-center gap-3">
+                  <div class="w-14 h-14 rounded-full bg-gradient-to-br from-[#38BDF8] to-[#6366F1] flex items-center justify-center text-white text-[10px] font-black shadow-lg">Library</div>
+                  <div class="w-12 h-12 rounded-full bg-gradient-to-br from-[#F472B6] to-[#EC4899] flex items-center justify-center text-white text-[10px] font-black shadow-lg">Exam</div>
+                </div>
+                <span class="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-white/15 text-purple-100 text-[10px] font-bold uppercase">Đợt 2 · Sắp mở</span>
+              </div>
+              <div class="p-5 flex-1 flex flex-col justify-between gap-4">
+                <div>
+                  <h3 class="text-lg font-extrabold text-[#160A33]">Bắn thiên thạch (Blast)</h3>
+                  <p class="text-xs text-[#5B5373] mt-1 leading-relaxed">Bắn trúng thiên thạch chứa đáp án đúng đang bay ngang không gian với tốc độ tăng dần và chuỗi combo.</p>
+                </div>
+                <button type="button" disabled class="w-full py-3 rounded-2xl bg-[#F3EEFF] text-[#7C3AED] font-bold text-xs cursor-not-allowed">
+                  Chuẩn bị ra mắt ở Đợt 2
+                </button>
+              </div>
+            </div>
+
+            <!-- Game #3: Mastery Peak (Đợt 3) -->
+            <div class="rounded-3xl bg-white border-2 border-[#EDE5FF] shadow-xs overflow-hidden flex flex-col opacity-90">
+              <div class="aspect-[16/9] bg-gradient-to-br from-[#064E3B] via-[#0F766E] to-[#115E59] p-4 flex items-center justify-center relative">
+                <svg class="w-24 h-24 text-[#5EEAD4]" viewBox="0 0 80 80" fill="none">
+                  <path d="M10 66 L36 20 L52 44 L60 32 L72 66 Z" fill="currentColor" opacity="0.28"/>
+                  <path d="M10 66 L36 20 L52 44 L60 32 L72 66" stroke="#34F5A5" stroke-width="3.5" stroke-linejoin="round"/>
+                  <circle cx="36" cy="18" r="5" fill="#FFCD1F"/>
+                </svg>
+                <span class="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-white/15 text-emerald-100 text-[10px] font-bold uppercase">Đợt 3 · Sắp mở</span>
+              </div>
+              <div class="p-5 flex-1 flex flex-col justify-between gap-4">
+                <div>
+                  <h3 class="text-lg font-extrabold text-[#160A33]">Leo núi Mastery Peak</h3>
+                  <p class="text-xs text-[#5B5373] mt-1 leading-relaxed">Chinh phục đỉnh núi nhiều chặng với thẻ kỹ năng Power-Ups (50/50, x2 điểm, khiên) và tự lặp lại câu sai.</p>
+                </div>
+                <button type="button" disabled class="w-full py-3 rounded-2xl bg-[#F3EEFF] text-[#7C3AED] font-bold text-xs cursor-not-allowed">
+                  Chuẩn bị ra mắt ở Đợt 3
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderMatchSetup() {
+      const readyTopics = TOPICS.filter(t => getWordsByTopic(t.id).length > 0);
+      const selectedTopics = matchState.selectedTopics.length ? matchState.selectedTopics : (readyTopics[0] ? [readyTopics[0].id] : []);
+      const allTopicWords = VOCAB.filter(w => selectedTopics.includes(w.topic));
+      const candidateWords = getMatchCandidateWords();
+      const q = (matchState.customSearch || '').trim().toLowerCase();
+      const filteredCustom = q
+        ? allTopicWords.filter(w => w.word.toLowerCase().includes(q) || w.vi.toLowerCase().includes(q))
+        : allTopicWords;
+
+      return `
+        <section class="max-w-3xl mx-auto space-y-5">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <button data-action="match-back-hub" type="button" class="text-xs font-extrabold text-[#6D28D9] hover:underline mb-1">&larr; Quay lại Sảnh Trò chơi</button>
+              <h1 class="text-2xl font-extrabold text-[#160A33] dark-adapt">Cài đặt ván Ghép thẻ tính giờ</h1>
+            </div>
+            <button data-action="match-toggle-sound" type="button"
+              class="px-3 py-2 rounded-xl bg-white border-2 border-[#EDE5FF] text-xs font-extrabold text-[#5B21B6] flex items-center gap-1.5">
+              <span>${matchState.soundOn ? 'Âm thanh: BẬT' : 'Âm thanh: TẮT'}</span>
+            </button>
+          </div>
+
+          <div class="bg-white rounded-3xl border-2 border-[#EDE5FF] p-5 sm:p-6 shadow-md space-y-5">
+            <!-- Step 1: Multi-Topic Picker -->
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-extrabold text-[#5B21B6] uppercase tracking-wider">1. Chọn chủ đề (chọn 1, 2 hoặc nhiều chủ đề)</label>
+                <span class="text-xs font-bold text-[#5B5373]">Đã chọn ${selectedTopics.length} chủ đề · ${allTopicWords.length} từ</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                ${readyTopics.map(t => {
+                  const active = selectedTopics.includes(t.id);
+                  const cnt = getWordsByTopic(t.id).length;
+                  return `
+                    <button data-action="match-toggle-topic" data-topic="${escapeAttr(t.id)}" type="button"
+                      class="px-3.5 py-2 rounded-xl border-2 text-xs font-extrabold flex items-center gap-2 transition ${
+                        active
+                          ? 'bg-[#6D28D9] border-[#6D28D9] text-white shadow-sm'
+                          : 'bg-[#F7F5FF] border-[#EDE5FF] text-[#160A33] hover:border-[#C4B5FD]'
+                      }">
+                      <span>${escapeHtml(t.name)} (${escapeHtml(t.viName)})</span>
+                      <span class="px-1.5 py-0.5 rounded-md text-[10px] ${active ? 'bg-white/20 text-white' : 'bg-white text-[#6D28D9]'}">${cnt} từ</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- Step 2: Word Filter / Custom Word Picker -->
+            <div class="space-y-2.5">
+              <label class="block text-xs font-extrabold text-[#5B21B6] uppercase tracking-wider">2. Chọn nguồn từ trong chủ đề</label>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                ${[
+                  { id: 'all', title: 'Ngẫu nhiên tất cả', sub: `${allTopicWords.length} từ sẵn có` },
+                  { id: 'unlearned', title: 'Ưu tiên từ chưa thuộc', sub: `${allTopicWords.filter(w => !state.learned.has(w.id)).length} từ chưa thuộc` },
+                  { id: 'custom', title: 'Tự chọn từng từ', sub: `Đã tích ${matchState.customWordIds.size} từ` }
+                ].map(opt => `
+                  <button data-action="match-set-filter" data-filter="${opt.id}" type="button"
+                    class="p-3 rounded-2xl border-2 text-left transition ${
+                      matchState.wordFilter === opt.id
+                        ? 'bg-[#F3EEFF] border-[#6D28D9]'
+                        : 'bg-[#F9F8FF] border-[#EDE5FF] hover:border-[#C4B5FD]'
+                    }">
+                    <div class="text-xs font-extrabold text-[#160A33]">${opt.title}</div>
+                    <div class="text-[11px] text-[#5B5373] mt-0.5">${opt.sub}</div>
+                  </button>
+                `).join('')}
+              </div>
+
+              ${matchState.wordFilter === 'custom' ? `
+                <div class="p-3.5 rounded-2xl bg-[#F7F5FF] border border-[#DDD6FE] space-y-2.5">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <input id="match-custom-search" type="text" value="${escapeHtml(matchState.customSearch)}" placeholder="Tìm từ muốn chọn..."
+                      class="flex-1 min-w-[160px] px-3 py-1.5 rounded-xl bg-white border border-[#DDD6FE] text-xs font-semibold focus:outline-none focus:border-[#6D28D9]" />
+                    <button data-action="match-custom-select-12" type="button" class="px-2.5 py-1.5 rounded-xl bg-white border border-[#DDD6FE] text-[11px] font-bold text-[#5B21B6] hover:bg-[#EDE5FF]">Chọn nhanh 12 từ đầu</button>
+                    <button data-action="match-custom-clear" type="button" class="px-2.5 py-1.5 rounded-xl bg-white border border-rose-200 text-[11px] font-bold text-rose-600 hover:bg-rose-50">Bỏ chọn hết</button>
+                  </div>
+                  <div class="max-h-48 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-1.5 pr-1">
+                    ${filteredCustom.slice(0, 80).map(w => {
+                      const picked = matchState.customWordIds.has(w.id);
+                      return `
+                        <button data-action="match-toggle-word" data-id="${escapeAttr(w.id)}" type="button"
+                          class="px-2.5 py-1.5 rounded-xl border text-left flex items-center justify-between gap-2 transition ${
+                            picked ? 'bg-[#6D28D9] border-[#6D28D9] text-white' : 'bg-white border-[#EDE5FF] text-[#160A33] hover:border-[#C4B5FD]'
+                          }">
+                          <span class="text-xs font-bold truncate">${escapeHtml(w.word)} <span class="font-normal opacity-80">— ${escapeHtml(w.vi)}</span></span>
+                          <span class="text-[11px] font-black shrink-0">${picked ? '✓' : '+'}</span>
+                        </button>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Step 3: Pair Count & Match Type -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <label class="block text-xs font-extrabold text-[#5B21B6] uppercase tracking-wider">3. Số cặp thẻ mỗi ván</label>
+                <div class="grid grid-cols-4 gap-2">
+                  ${[6, 8, 10, 12].map(n => `
+                    <button data-action="match-set-pairs" data-pairs="${n}" type="button"
+                      class="py-2.5 rounded-xl border-2 text-center transition ${
+                        matchState.pairCount === n
+                          ? 'bg-[#6D28D9] border-[#6D28D9] text-white shadow-sm'
+                          : 'bg-[#F7F5FF] border-[#EDE5FF] text-[#160A33] hover:border-[#C4B5FD]'
+                      }">
+                      <div class="text-sm font-extrabold">${n}</div>
+                      <div class="text-[10px] opacity-80">${n * 2} thẻ</div>
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <label class="block text-xs font-extrabold text-[#5B21B6] uppercase tracking-wider">4. Kiểu ghép cặp</label>
+                <div class="grid grid-cols-3 gap-2">
+                  ${[
+                    { id: 'en-vi', label: 'Anh ↔ Việt' },
+                    { id: 'en-img', label: 'Anh ↔ Ảnh' },
+                    { id: 'audio-vi', label: 'Nghe ↔ Việt' }
+                  ].map(m => `
+                    <button data-action="match-set-mode" data-mode="${m.id}" type="button"
+                      class="py-3 px-2 rounded-xl border-2 text-xs font-extrabold text-center transition ${
+                        matchState.matchMode === m.id
+                          ? 'bg-[#6D28D9] border-[#6D28D9] text-white shadow-sm'
+                          : 'bg-[#F7F5FF] border-[#EDE5FF] text-[#160A33] hover:border-[#C4B5FD]'
+                      }">${m.label}</button>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#EDE5FF]">
+              <div class="text-xs font-semibold text-[#5B5373]">
+                Sẽ lấy <strong class="text-[#6D28D9]">${Math.min(matchState.pairCount, candidateWords.length)} cặp</strong> (${Math.min(matchState.pairCount, candidateWords.length) * 2} thẻ) · Sai phạt <strong>+1.5s</strong>
+              </div>
+              <button data-action="match-start-now" type="button"
+                class="btn-tactile w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[#2EF29B] hover:bg-[#1EE08A] border-[#10B981] text-[#160A33] font-extrabold text-sm shadow-lg shadow-emerald-500/20">
+                Bắt đầu ghép thẻ ngay &rarr;
+              </button>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderMatchPlay() {
+      const totalPairs = matchState.cards.length / 2;
+      const donePairs = matchState.matchedPairIds.size;
+      const gridCols = matchState.cards.length <= 12 ? 'grid-cols-3 sm:grid-cols-4' : matchState.cards.length <= 16 ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6';
+
+      return `
+        <section class="rounded-3xl bg-gradient-to-br from-[#1A0B3B] via-[#2B1261] to-[#1E1047] p-4 sm:p-6 text-white shadow-2xl border border-purple-400/25 space-y-4">
+          <!-- Live HUD Bar -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-white/10">
+            <div class="flex items-center gap-2.5">
+              <div class="px-3.5 py-2 rounded-2xl bg-white/12 border border-white/15 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-[#34F5A5] animate-pulse"></span>
+                <span id="match-live-timer" class="text-base sm:text-lg font-black tabular-nums text-[#34F5A5]">${(matchState.elapsedMs / 1000).toFixed(1)}s</span>
+              </div>
+              <div class="px-3 py-2 rounded-2xl bg-white/10 border border-white/10 text-xs font-extrabold text-purple-100">
+                ${donePairs}/${totalPairs} cặp
+              </div>
+              ${matchState.combo >= 2 ? `
+                <div class="px-3 py-1.5 rounded-2xl bg-[#FFCD1F] text-[#160A33] text-xs font-black animate-bounce">
+                  Combo x${matchState.combo}!
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button data-action="match-toggle-sound" type="button" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-purple-100 transition">
+                ${matchState.soundOn ? 'Âm: Bật' : 'Âm: Tắt'}
+              </button>
+              <button data-action="match-start-now" type="button" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition">
+                Chơi lại
+              </button>
+              <button data-action="match-open-setup" type="button" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-xs font-bold text-white transition">
+                Cài đặt
+              </button>
+            </div>
+          </div>
+
+          <!-- Progress Strip -->
+          <div class="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-[#2EF29B] via-[#38BDF8] to-[#F472B6] rounded-full transition-all duration-300" style="width:${Math.round((donePairs / Math.max(1, totalPairs)) * 100)}%"></div>
+          </div>
+
+          <!-- Tactile 3D Match Cards Grid -->
+          <div class="grid ${gridCols} gap-2.5 sm:gap-3 pt-1">
+            ${matchState.cards.map(c => {
+              const isMatched = matchState.matchedPairIds.has(c.pairId);
+              const isSelected = matchState.selectedIds.includes(c.uid);
+              const isWrong = matchState.wrongIds.includes(c.uid);
+
+              if (isMatched) {
+                return `<div class="min-h-[86px] sm:min-h-[104px] rounded-2xl border border-dashed border-white/10 bg-white/[0.03] flex items-center justify-center text-[#34F5A5]/40 text-xs font-black select-none">✓</div>`;
+              }
+
+              let cardCls = 'bg-white text-[#160A33] border-b-4 border-[#DDD6FE] hover:-translate-y-1 hover:shadow-lg';
+              if (c.side === 'b' && c.kind === 'vi') {
+                cardCls = 'bg-[#F5F0FF] text-[#2E1065] border-b-4 border-[#C4B5FD] hover:-translate-y-1 hover:shadow-lg';
+              }
+              if (isWrong) {
+                cardCls = 'bg-rose-500 text-white border-b-4 border-rose-700 animate-match-shake';
+              } else if (isSelected) {
+                cardCls = 'bg-[#2EF29B] text-[#160A33] border-b-4 border-[#059669] -translate-y-1 ring-4 ring-[#2EF29B]/40 shadow-xl';
+              }
+
+              return `
+                <button data-action="match-pick-card" data-uid="${escapeAttr(c.uid)}" type="button"
+                  class="min-h-[86px] sm:min-h-[104px] p-2.5 rounded-2xl font-extrabold flex flex-col items-center justify-center text-center transition-all cursor-pointer select-none ${cardCls}">
+                  ${c.kind === 'img' && c.image ? `
+                    <div class="w-full aspect-[4/3] rounded-xl overflow-hidden bg-slate-100">
+                      <img src="${escapeAttr(c.image)}" alt="" class="w-full h-full object-cover" />
+                    </div>
+                  ` : c.kind === 'audio' ? `
+                    <div class="w-9 h-9 rounded-full ${isSelected ? 'bg-[#160A33] text-[#2EF29B]' : 'bg-[#6D28D9] text-white'} flex items-center justify-center mb-1">
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+                    </div>
+                    <span class="text-[11px] font-extrabold">Bấm nghe</span>
+                  ` : `
+                    <span class="text-xs sm:text-sm leading-snug break-words">${escapeHtml(c.text)}</span>
+                    ${c.sub ? `<span class="text-[10px] font-semibold opacity-65 mt-0.5">${escapeHtml(c.sub)}</span>` : ''}
+                  `}
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderMatchWin() {
+      const totalPairs = matchState.cards.length / 2;
+      const sec = (matchState.elapsedMs / 1000).toFixed(1);
+      const bestKey = `${totalPairs}_${matchState.matchMode}`;
+      const best = state.matchBestTimes[bestKey] || sec;
+
+      return `
+        <section class="max-w-xl mx-auto rounded-3xl bg-gradient-to-br from-[#2E1065] via-[#4C1D95] to-[#6D28D9] p-6 sm:p-8 text-white text-center shadow-2xl border border-purple-300/25 space-y-5 animate-pop">
+          <div class="w-16 h-16 rounded-3xl bg-[#FFCD1F] text-[#160A33] mx-auto flex items-center justify-center shadow-lg">
+            <svg class="w-9 h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+          </div>
+          <div>
+            ${matchState.isNewRecord ? `<span class="inline-block px-3 py-1 rounded-full bg-[#2EF29B] text-[#160A33] text-[11px] font-black uppercase mb-2">Kỷ lục mới!</span>` : ''}
+            <h2 class="text-2xl sm:text-3xl font-extrabold">Xuất sắc! Hoàn thành ${totalPairs} cặp</h2>
+            <p class="text-purple-100/85 text-xs sm:text-sm mt-1">Tốc độ phản xạ từ vựng của bạn đang lên rất nhanh!</p>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2.5">
+            <div class="rounded-2xl bg-white/12 border border-white/15 p-3">
+              <div class="text-[10px] font-bold uppercase text-purple-200">Thời gian</div>
+              <div class="text-2xl font-extrabold text-[#34F5A5] mt-0.5">${sec}s</div>
+            </div>
+            <div class="rounded-2xl bg-white/12 border border-white/15 p-3">
+              <div class="text-[10px] font-bold uppercase text-purple-200">Combo cao nhất</div>
+              <div class="text-2xl font-extrabold text-[#FFCD1F] mt-0.5">x${matchState.maxCombo}</div>
+            </div>
+            <div class="rounded-2xl bg-white/12 border border-white/15 p-3">
+              <div class="text-[10px] font-bold uppercase text-purple-200">Kỷ lục tốt nhất</div>
+              <div class="text-2xl font-extrabold text-white mt-0.5">${best}s</div>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
+            <button data-action="match-start-now" type="button"
+              class="btn-tactile flex-1 py-3.5 rounded-2xl bg-[#2EF29B] hover:bg-[#1EE08A] border-[#10B981] text-[#160A33] font-extrabold text-sm">
+              Chơi ván mới ngay
+            </button>
+            <button data-action="match-open-setup" type="button"
+              class="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-bold text-sm transition">
+              Đổi chủ đề / số thẻ
+            </button>
+          </div>
+        </section>
+      `;
+    }
+
     // Main Render
     function render() {
       const main = document.getElementById('app-main');
@@ -3746,10 +4486,22 @@
         main.innerHTML = renderDictionary();
       } else if (state.view === 'quiz') {
         main.innerHTML = state.quizActive ? renderQuizActive() : renderQuizSetup();
+      } else if (state.view === 'games') {
+        main.innerHTML = renderGamesView();
       }
       updateHeaderUI();
       if (window.lucide) lucide.createIcons();
 
+      const matchSearchEl = document.getElementById('match-custom-search');
+      if (matchSearchEl) {
+        matchSearchEl.addEventListener('input', (e) => {
+          matchState.customSearch = e.target.value;
+          const pos = e.target.selectionStart;
+          render();
+          const el2 = document.getElementById('match-custom-search');
+          if (el2) { el2.focus(); el2.setSelectionRange(pos, pos); }
+        });
+      }
       const searchEl = document.getElementById('home-search-input');
       if (searchEl) {
         searchEl.addEventListener('input', (e) => {
@@ -3904,6 +4656,95 @@
       }
       if (action === 'stats-go-learn') { closeStatsModal(); setView('learn'); return; }
       if (action === 'stats-go-quiz') { closeStatsModal(); setView('quiz'); return; }
+      if (action === 'set-bg-mode') {
+        state.bgTheme.mode = actEl.dataset.mode || 'soft';
+        applyBgTheme();
+        saveState();
+        openVoiceModal();
+        return;
+      }
+      if (action === 'reset-bg-theme') {
+        state.bgTheme = { mode: 'soft', hue: 258 };
+        applyBgTheme();
+        saveState();
+        openVoiceModal();
+        showToast('Đã đặt lại màu nền mặc định');
+        return;
+      }
+      if (action === 'match-open-setup') {
+        stopMatchTimer();
+        matchState.screen = 'setup';
+        render();
+        return;
+      }
+      if (action === 'match-back-hub') {
+        stopMatchTimer();
+        matchState.screen = 'hub';
+        render();
+        return;
+      }
+      if (action === 'match-toggle-topic') {
+        const tid = actEl.dataset.topic;
+        if (tid) {
+          if (matchState.selectedTopics.includes(tid)) {
+            if (matchState.selectedTopics.length > 1) {
+              matchState.selectedTopics = matchState.selectedTopics.filter(x => x !== tid);
+            }
+          } else {
+            matchState.selectedTopics = [...matchState.selectedTopics, tid];
+          }
+          render();
+        }
+        return;
+      }
+      if (action === 'match-set-filter') {
+        matchState.wordFilter = actEl.dataset.filter || 'all';
+        render();
+        return;
+      }
+      if (action === 'match-toggle-word') {
+        const wid = actEl.dataset.id;
+        if (wid) {
+          if (matchState.customWordIds.has(wid)) matchState.customWordIds.delete(wid);
+          else matchState.customWordIds.add(wid);
+          render();
+        }
+        return;
+      }
+      if (action === 'match-custom-select-12') {
+        const words = VOCAB.filter(w => matchState.selectedTopics.includes(w.topic)).slice(0, 12);
+        words.forEach(w => matchState.customWordIds.add(w.id));
+        render();
+        return;
+      }
+      if (action === 'match-custom-clear') {
+        matchState.customWordIds.clear();
+        render();
+        return;
+      }
+      if (action === 'match-set-pairs') {
+        matchState.pairCount = Number(actEl.dataset.pairs) || 8;
+        render();
+        return;
+      }
+      if (action === 'match-set-mode') {
+        matchState.matchMode = actEl.dataset.mode || 'en-vi';
+        render();
+        return;
+      }
+      if (action === 'match-toggle-sound') {
+        matchState.soundOn = !matchState.soundOn;
+        render();
+        return;
+      }
+      if (action === 'match-start-now') {
+        startMatchGame();
+        return;
+      }
+      if (action === 'match-pick-card') {
+        handleMatchCardClick(actEl.dataset.uid);
+        return;
+      }
       if (action === 'close-auth-modal') { closeAuthModal(); return; }
       if (action === 'set-auth-mode') {
         state.authMode = actEl.dataset.mode === 'signup' ? 'signup' : 'login';
