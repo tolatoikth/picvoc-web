@@ -2709,24 +2709,111 @@
       return a;
     }
 
+    let quizAutoNextTimer = null;
+
+    function clearQuizAutoNext() {
+      if (quizAutoNextTimer) {
+        clearTimeout(quizAutoNextTimer);
+        quizAutoNextTimer = null;
+      }
+    }
+
+    function syncQuizViewFromIndex() {
+      const q = state.quizQuestions[state.quizIndex];
+      if (!q) {
+        state.quizAnswered = false;
+        state.quizSelectedOption = null;
+        return;
+      }
+      state.quizAnswered = !!q.answered;
+      state.quizSelectedOption = q.selectedOption || null;
+      if (state.quizMode === 'spelling') {
+        if (q.spellTiles) {
+          state.spellTiles = q.spellTiles;
+          state.spellPicked = q.spellPicked || [];
+          state.spellStatus = q.spellStatus || null;
+        } else {
+          setupSpellingForCurrent();
+          q.spellTiles = state.spellTiles;
+          q.spellPicked = state.spellPicked;
+          q.spellStatus = state.spellStatus;
+        }
+      }
+    }
+
+    function goQuizPrev() {
+      clearQuizAutoNext();
+      if (state.quizIndex <= 0) return;
+      // Persist current spelling draft before navigating back
+      const curQ = state.quizQuestions[state.quizIndex];
+      if (curQ && state.quizMode === 'spelling') {
+        curQ.spellTiles = state.spellTiles;
+        curQ.spellPicked = state.spellPicked;
+        curQ.spellStatus = state.spellStatus;
+      }
+      state.quizIndex--;
+      syncQuizViewFromIndex();
+      render();
+    }
+
+    function goQuizNext() {
+      clearQuizAutoNext();
+      const total = state.quizQuestions.length;
+      if (state.quizIndex >= total) return;
+      const curQ = state.quizQuestions[state.quizIndex];
+      const frontier = state.quizFrontier || 0;
+      if (state.quizIndex < frontier) {
+        state.quizIndex++;
+        syncQuizViewFromIndex();
+        render();
+        return;
+      }
+      if (!curQ || !curQ.answered) return;
+      state.quizIndex++;
+      state.quizFrontier = Math.max(frontier, state.quizIndex);
+      syncQuizViewFromIndex();
+      render();
+      if (state.quizMode === 'listen2pic' && state.quizIndex < total) {
+        const nw = state.quizQuestions[state.quizIndex].word;
+        setTimeout(() => speakText(nw.word, state.accent, state.speechRate, nw), 220);
+      }
+    }
+
+    function goQuizToCurrent() {
+      clearQuizAutoNext();
+      const frontier = Math.min(state.quizFrontier || 0, Math.max(0, state.quizQuestions.length - 1));
+      state.quizIndex = frontier;
+      syncQuizViewFromIndex();
+      render();
+    }
+
     function startQuiz() {
+      clearQuizAutoNext();
       const pool = getWordsByTopic(state.quizTopic);
       // Cap each quiz session at 15 questions so even 100-word topics stay snappy
       const chosen = shuffleArr(pool).slice(0, 15);
       const questions = chosen.map(word => {
         const distractors = shuffleArr(VOCAB.filter(w => w.id !== word.id)).slice(0, 3);
         const options = shuffleArr([word, ...distractors]);
-        return { word, options };
+        return { word, options, answered: false, selectedOption: null, isCorrect: false, spellTiles: null, spellPicked: null, spellStatus: null };
       });
       state.quizQuestions = questions;
       state.quizIndex = 0;
+      state.quizFrontier = 0;
       state.quizScore = 0;
       state.quizAnswered = false;
       state.quizSelectedOption = null;
       state.quizMistakes = [];
       state.quizActive = true;
       state.quizRecorded = false;
-      if (state.quizMode === 'spelling') setupSpellingForCurrent();
+      if (state.quizMode === 'spelling') {
+        setupSpellingForCurrent();
+        if (questions[0]) {
+          questions[0].spellTiles = state.spellTiles;
+          questions[0].spellPicked = state.spellPicked;
+          questions[0].spellStatus = state.spellStatus;
+        }
+      }
       render();
       if (state.quizMode === 'listen2pic' && questions[0]) {
         setTimeout(() => speakText(questions[0].word.word, state.accent, state.speechRate, questions[0].word), 250);
@@ -3059,35 +3146,75 @@
         `;
       }
 
+      const quizFrontier = state.quizFrontier || 0;
+      const isQuizReviewing = state.quizIndex < quizFrontier;
+      const canQuizPrev = state.quizIndex > 0;
+      const canQuizNext = isQuizReviewing || state.quizAnswered;
+
       return `
-        <section class="max-w-2xl mx-auto space-y-4">
-          <div class="flex items-center justify-between gap-3">
-            <button data-action="quiz-exit" type="button" class="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1">
-              <i data-lucide="arrow-left" class="w-4 h-4"></i> Thoát
-            </button>
-            <div class="text-xs font-extrabold text-slate-700">Câu ${state.quizIndex + 1} / ${total}</div>
-            <div class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">Đúng: ${state.quizScore}</div>
-          </div>
-
-          <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-            <div class="bg-emerald-500 h-full transition-all duration-300" style="width: ${pct}%"></div>
-          </div>
-
-          ${bodyHtml}
-
-          ${state.quizAnswered ? `
-            <div class="flex items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200 p-4 shadow-xs animate-pop">
-              <div class="min-w-0">
-                <div class="text-sm font-extrabold text-slate-900">${escapeHtml(w.word)} <span class="font-medium text-slate-400 text-xs">${escapeHtml(state.accent === 'UK' ? w.ipaUK : w.ipaUS)}</span></div>
-                <div class="text-xs text-slate-600 truncate">${escapeHtml(w.vi)} — ${escapeHtml(w.example)}</div>
-              </div>
-              <button data-action="quiz-next" type="button"
-                class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-1.5 shrink-0 transition">
-                <span>${state.quizIndex + 1 < total ? 'Câu tiếp' : 'Xem kết quả'}</span>
-                <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        <section class="max-w-3xl mx-auto space-y-4">
+          <div class="max-w-2xl mx-auto space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <button data-action="quiz-exit" type="button" class="text-xs font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1">
+                <i data-lucide="arrow-left" class="w-4 h-4"></i> Thoát
               </button>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-extrabold text-slate-700">Câu ${state.quizIndex + 1} / ${total}</span>
+                ${isQuizReviewing ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold">Xem lại</span>` : ''}
+              </div>
+              <div class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">Đúng: ${state.quizScore}</div>
             </div>
-          ` : ''}
+
+            <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+              <div class="bg-emerald-500 h-full transition-all duration-300" style="width: ${pct}%"></div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1.5 sm:gap-3">
+            <button data-action="quiz-prev" type="button" ${canQuizPrev ? '' : 'disabled'} title="Quay về câu trước"
+              class="w-9 h-12 sm:w-11 sm:h-14 rounded-2xl border-2 flex items-center justify-center shrink-0 transition ${
+                canQuizPrev
+                  ? 'bg-white hover:bg-[#F3EEFF] border-[#DDD6FE] text-[#6D28D9] shadow-sm active:scale-95'
+                  : 'bg-slate-100/80 border-slate-200 text-slate-300 cursor-not-allowed'
+              }">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+
+            <div class="flex-1 min-w-0 space-y-3">
+              ${bodyHtml}
+
+              ${isQuizReviewing ? `
+                <div class="flex items-center justify-between gap-3 bg-amber-50/90 rounded-2xl border border-amber-200 px-4 py-2.5">
+                  <span class="text-xs font-bold text-amber-900">Đang xem lại câu ${state.quizIndex + 1} (đã trả lời)</span>
+                  <button data-action="quiz-jump-current" type="button"
+                    class="px-3.5 py-1.5 rounded-xl bg-[#6D28D9] hover:bg-[#5B21B6] text-white text-xs font-extrabold shrink-0 transition">
+                    Về câu hiện tại &rarr;
+                  </button>
+                </div>
+              ` : (state.quizAnswered ? `
+                <div class="flex items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200 p-4 shadow-xs animate-pop">
+                  <div class="min-w-0">
+                    <div class="text-sm font-extrabold text-slate-900">${escapeHtml(w.word)} <span class="font-medium text-slate-400 text-xs">${escapeHtml(state.accent === 'UK' ? w.ipaUK : w.ipaUS)}</span></div>
+                    <div class="text-xs text-slate-600 truncate">${escapeHtml(w.vi)} — ${escapeHtml(w.example)}</div>
+                  </div>
+                  <button data-action="quiz-next" type="button"
+                    class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-1.5 shrink-0 transition">
+                    <span>${state.quizIndex + 1 < total ? 'Câu tiếp' : 'Xem kết quả'}</span>
+                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              ` : '')}
+            </div>
+
+            <button data-action="quiz-next" type="button" ${canQuizNext ? '' : 'disabled'} title="${isQuizReviewing ? 'Tiến tới câu tiếp theo' : 'Câu tiếp theo'}"
+              class="w-9 h-12 sm:w-11 sm:h-14 rounded-2xl border-2 flex items-center justify-center shrink-0 transition ${
+                canQuizNext
+                  ? 'bg-white hover:bg-[#F3EEFF] border-[#DDD6FE] text-[#6D28D9] shadow-sm active:scale-95'
+                  : 'bg-slate-100/80 border-slate-200 text-slate-300 cursor-not-allowed'
+              }">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
         </section>
       `;
     }
@@ -6000,7 +6127,10 @@
       activeShield: false,
       statusBanner: '',
       isNewRecord: false,
-      pool: []
+      pool: [],
+      history: [],
+      historyIdx: -1,
+      autoNextTimer: null
     };
 
     const PEAK_MOUNTAINS = {
@@ -6014,7 +6144,57 @@
       return VOCAB.filter(w => topics.includes(w.topic));
     }
 
+    function clearPeakAutoNext() {
+      if (peakState.autoNextTimer) {
+        clearTimeout(peakState.autoNextTimer);
+        peakState.autoNextTimer = null;
+      }
+    }
+
+    function syncPeakFromHistory() {
+      const snap = peakState.history[peakState.historyIdx];
+      if (!snap) return;
+      peakState.currentItem = snap.item;
+      peakState.options = snap.options;
+      peakState.answered = snap.answered;
+      peakState.pickedId = snap.pickedId;
+      peakState.lastCorrect = snap.lastCorrect;
+      peakState.statusBanner = snap.statusBanner;
+    }
+
+    function goPeakPrev() {
+      clearPeakAutoNext();
+      if (peakState.historyIdx <= 0) return;
+      peakState.historyIdx--;
+      syncPeakFromHistory();
+      render();
+    }
+
+    function goPeakNext() {
+      clearPeakAutoNext();
+      const latestIdx = peakState.history.length - 1;
+      if (peakState.historyIdx < latestIdx) {
+        peakState.historyIdx++;
+        syncPeakFromHistory();
+        render();
+        return;
+      }
+      const snap = peakState.history[latestIdx];
+      if (!snap || !snap.answered || peakState.climbedSteps >= peakState.goalSteps) return;
+      prepareNextPeakQuestion();
+      render();
+    }
+
+    function goPeakToCurrent() {
+      clearPeakAutoNext();
+      if (!peakState.history.length) return;
+      peakState.historyIdx = peakState.history.length - 1;
+      syncPeakFromHistory();
+      render();
+    }
+
     function prepareNextPeakQuestion() {
+      clearPeakAutoNext();
       if (!peakState.queue.length) {
         // Refill if somehow empty before reaching summit
         const extra = [...peakState.pool].sort(() => Math.random() - 0.5).slice(0, 6);
@@ -6025,13 +6205,8 @@
         ? (Math.random() < 0.35 ? 'audio2vi' : (Math.random() < 0.5 ? 'vi2en' : 'en2vi'))
         : peakState.mode;
       item.qType = qType;
-      peakState.currentItem = item;
-      peakState.answered = false;
-      peakState.pickedId = null;
-      peakState.lastCorrect = false;
       peakState.activeDouble = false;
       peakState.activeShield = false;
-      peakState.statusBanner = '';
 
       const w = item.wordObj;
       const distractors = peakState.pool
@@ -6045,7 +6220,18 @@
         isCorrect: x.id === w.id,
         eliminated: false
       }));
-      peakState.options = opts;
+
+      const snap = {
+        item,
+        options: opts,
+        answered: false,
+        pickedId: null,
+        lastCorrect: false,
+        statusBanner: ''
+      };
+      peakState.history.push(snap);
+      peakState.historyIdx = peakState.history.length - 1;
+      syncPeakFromHistory();
 
       if (qType === 'audio2vi') {
         setTimeout(() => {
@@ -6055,6 +6241,7 @@
     }
 
     function startPeakGame() {
+      clearPeakAutoNext();
       const pool = getPeakPool();
       if (pool.length < 4) {
         showToast('Cần ít nhất 4 từ vựng để leo núi Mastery Peak! Hãy chọn thêm chủ đề.');
@@ -6072,6 +6259,8 @@
       peakState.retriedMastered = 0;
       peakState.powerUps = { fifty: 2, double: 2, shield: 1 };
       peakState.isNewRecord = false;
+      peakState.history = [];
+      peakState.historyIdx = -1;
 
       // Prioritize unlearned words first for real mastery!
       const unlearned = pool.filter(w => !state.learned.has(w.id)).sort(() => Math.random() - 0.5);
@@ -6087,7 +6276,7 @@
     }
 
     function usePeakPowerUp(kind) {
-      if (peakState.screen !== 'play' || peakState.answered) return;
+      if (peakState.screen !== 'play' || peakState.answered || peakState.historyIdx !== peakState.history.length - 1) return;
       if (kind === 'fifty' && peakState.powerUps.fifty > 0) {
         const wrongOpts = peakState.options.filter(o => !o.isCorrect && !o.eliminated);
         if (wrongOpts.length < 2) return;
@@ -6115,7 +6304,7 @@
     }
 
     function answerPeakOption(optId) {
-      if (peakState.screen !== 'play' || peakState.answered) return;
+      if (peakState.screen !== 'play' || peakState.answered || peakState.historyIdx !== peakState.history.length - 1) return;
       const opt = peakState.options.find(o => o.id === optId);
       if (!opt || opt.eliminated) return;
 
@@ -6147,11 +6336,19 @@
           bonusNote = ` · Thưởng +1 thẻ ${names[pick]}!`;
         }
         peakState.statusBanner = `Chính xác! +${gained} điểm · Leo thêm 1 chặng${bonusNote}`;
+        const curSnap = peakState.history[peakState.historyIdx];
+        if (curSnap) {
+          curSnap.answered = true;
+          curSnap.pickedId = optId;
+          curSnap.lastCorrect = true;
+          curSnap.statusBanner = peakState.statusBanner;
+        }
         gameSfx.match(peakState.combo);
         try { speakText(curW.word, null, null, curW); } catch (e) {}
 
         // Check Summit Reached!
         if (peakState.climbedSteps >= peakState.goalSteps) {
+          clearPeakAutoNext();
           const prev = state.peakBestScores || { bestScore: 0, summits: 0 };
           const nextSummits = (prev.summits || 0) + 1;
           const isRec = peakState.score > (prev.bestScore || 0);
@@ -6172,6 +6369,16 @@
           }, 950);
           return;
         }
+
+        // Auto-advance immediately after short green confirmation flash
+        clearPeakAutoNext();
+        const answeredHIdx = peakState.historyIdx;
+        peakState.autoNextTimer = setTimeout(() => {
+          if (peakState.screen === 'play' && peakState.historyIdx === answeredHIdx && peakState.climbedSteps < peakState.goalSteps) {
+            prepareNextPeakQuestion();
+            render();
+          }
+        }, 650);
       } else {
         peakState.lastCorrect = false;
         gameSfx.wrong();
@@ -6184,6 +6391,13 @@
         } else {
           peakState.combo = 0;
           peakState.statusBanner = `Chưa chính xác! Câu "${curW.word}" sẽ tự động lặp lại sau 2 lượt để bạn chinh phục lại.`;
+        }
+        const curSnap = peakState.history[peakState.historyIdx];
+        if (curSnap) {
+          curSnap.answered = true;
+          curSnap.pickedId = optId;
+          curSnap.lastCorrect = false;
+          curSnap.statusBanner = peakState.statusBanner;
         }
       }
       render();
@@ -6354,63 +6568,95 @@
             </button>
           </div>
 
-          <!-- Question Card -->
-          ${w ? `
-            <div class="rounded-2xl bg-white text-[#160A33] p-5 space-y-4 shadow-xl">
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <div class="flex items-center gap-2 mb-1">
-                    <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#6D28D9]">
-                      ${item.qType === 'vi2en' ? 'Chọn từ tiếng Anh đúng' : item.qType === 'audio2vi' ? 'Nghe phát âm & chọn nghĩa' : 'Chọn nghĩa tiếng Việt đúng'}
-                    </span>
-                    ${item.isRetry ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black">Ôn lại câu sai</span>` : ''}
+          <!-- Question Card with Side Navigation Arrows -->
+          ${w ? (() => {
+            const isPeakReviewing = peakState.historyIdx < peakState.history.length - 1;
+            const canPeakPrev = peakState.historyIdx > 0;
+            const canPeakNext = isPeakReviewing || (peakState.answered && peakState.climbedSteps < peakState.goalSteps);
+            return `
+            <div class="flex items-center gap-1.5 sm:gap-3">
+              <button data-action="peak-prev" type="button" ${canPeakPrev ? '' : 'disabled'} title="Quay về câu trước"
+                class="w-9 h-12 sm:w-11 sm:h-14 rounded-2xl border flex items-center justify-center shrink-0 transition ${
+                  canPeakPrev
+                    ? 'bg-white/15 hover:bg-white/25 border-white/25 text-white shadow-lg active:scale-95'
+                    : 'bg-white/5 border-white/10 text-white/25 cursor-not-allowed'
+                }">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+
+              <div class="flex-1 min-w-0 rounded-2xl bg-white text-[#160A33] p-4 sm:p-5 space-y-4 shadow-xl">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="flex items-center flex-wrap gap-2 mb-1">
+                      <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#6D28D9]">
+                        ${item.qType === 'vi2en' ? 'Chọn từ tiếng Anh đúng' : item.qType === 'audio2vi' ? 'Nghe phát âm & chọn nghĩa' : 'Chọn nghĩa tiếng Việt đúng'}
+                      </span>
+                      ${item.isRetry ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black">Ôn lại câu sai</span>` : ''}
+                      ${isPeakReviewing ? `<span class="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black">Đang xem lại câu ${peakState.historyIdx + 1}</span>` : ''}
+                    </div>
+                    <div class="text-xl sm:text-2xl font-extrabold text-[#160A33]">
+                      ${item.qType === 'vi2en' ? escapeHtml(w.vi) : item.qType === 'audio2vi' ? (peakState.answered ? escapeHtml(w.word) : 'Bấm loa để nghe từ vựng') : escapeHtml(w.word)}
+                    </div>
+                    ${(item.qType === 'en2vi' || peakState.answered) && w.ipaUS ? `<div class="text-xs font-semibold text-[#6D28D9] mt-0.5">${escapeHtml(w.ipaUS)} · ${escapeHtml(w.pos || '')}</div>` : ''}
                   </div>
-                  <div class="text-xl sm:text-2xl font-extrabold text-[#160A33]">
-                    ${item.qType === 'vi2en' ? escapeHtml(w.vi) : item.qType === 'audio2vi' ? 'Bấm loa để nghe từ vựng' : escapeHtml(w.word)}
-                  </div>
-                  ${item.qType === 'en2vi' && w.ipaUS ? `<div class="text-xs font-semibold text-[#6D28D9] mt-0.5">${escapeHtml(w.ipaUS)} · ${escapeHtml(w.pos || '')}</div>` : ''}
-                </div>
-                ${item.qType !== 'vi2en' ? `
-                  <button data-action="peak-replay-audio" type="button"
+                  <button data-action="peak-replay-audio" type="button" title="Nghe phát âm"
                     class="w-11 h-11 rounded-2xl bg-[#F3EEFF] hover:bg-[#E4DAFF] text-[#6D28D9] flex items-center justify-center shrink-0 transition">
                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
                   </button>
-                ` : ''}
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                ${peakState.options.map((o, idx) => {
-                  let cls = 'bg-[#F7F5FF] hover:bg-[#EDE5FF] border-[#DDD6FE] text-[#160A33]';
-                  if (o.eliminated) {
-                    cls = 'bg-slate-100 border-slate-200 text-slate-300 line-through cursor-not-allowed opacity-45';
-                  } else if (peakState.answered) {
-                    if (o.isCorrect) cls = 'bg-emerald-500 border-emerald-600 text-white shadow-md';
-                    else if (o.id === peakState.pickedId) cls = 'bg-rose-500 border-rose-600 text-white';
-                    else cls = 'bg-slate-50 border-slate-200 text-slate-400';
-                  }
-                  return `
-                    <button data-action="peak-answer" data-opt="${escapeAttr(o.id)}" type="button" ${peakState.answered || o.eliminated ? 'disabled' : ''}
-                      class="p-3.5 rounded-2xl border-2 font-extrabold text-left flex items-center justify-between gap-2 transition ${cls}">
-                      <span class="text-sm">${escapeHtml(o.label)}</span>
-                      <span class="text-[11px] font-bold opacity-65 shrink-0">${String.fromCharCode(65 + idx)}</span>
-                    </button>
-                  `;
-                }).join('')}
-              </div>
-
-              ${peakState.statusBanner ? `
-                <div class="p-3 rounded-xl text-xs font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${peakState.answered ? (peakState.lastCorrect ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200') : 'bg-[#F3EEFF] text-[#5B21B6] border border-[#DDD6FE]'}">
-                  <span>${escapeHtml(peakState.statusBanner)}</span>
-                  ${peakState.answered && peakState.climbedSteps < peakState.goalSteps ? `
-                    <button data-action="peak-next-step" type="button"
-                      class="px-4 py-2 rounded-xl bg-[#6D28D9] hover:bg-[#5B21B6] text-white text-xs font-extrabold shrink-0 transition">
-                      Chặng tiếp theo &rarr;
-                    </button>
-                  ` : ''}
                 </div>
-              ` : ''}
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  ${peakState.options.map((o, idx) => {
+                    let cls = 'bg-[#F7F5FF] hover:bg-[#EDE5FF] border-[#DDD6FE] text-[#160A33]';
+                    if (o.eliminated) {
+                      cls = 'bg-slate-100 border-slate-200 text-slate-300 line-through cursor-not-allowed opacity-45';
+                    } else if (peakState.answered) {
+                      if (o.isCorrect) cls = 'bg-emerald-500 border-emerald-600 text-white shadow-md';
+                      else if (o.id === peakState.pickedId) cls = 'bg-rose-500 border-rose-600 text-white';
+                      else cls = 'bg-slate-50 border-slate-200 text-slate-400';
+                    }
+                    return `
+                      <button data-action="peak-answer" data-opt="${escapeAttr(o.id)}" type="button" ${peakState.answered || o.eliminated ? 'disabled' : ''}
+                        class="p-3.5 rounded-2xl border-2 font-extrabold text-left flex items-center justify-between gap-2 transition ${cls}">
+                        <span class="text-sm">${escapeHtml(o.label)}</span>
+                        <span class="text-[11px] font-bold opacity-65 shrink-0">${String.fromCharCode(65 + idx)}</span>
+                      </button>
+                    `;
+                  }).join('')}
+                </div>
+
+                ${isPeakReviewing ? `
+                  <div class="p-3 rounded-xl text-xs font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-purple-50 text-purple-900 border border-purple-200">
+                    <span>Đang xem lại câu ${peakState.historyIdx + 1}/${peakState.history.length} · Bấm mũi tên phải hoặc nút bên để quay về câu hiện tại.</span>
+                    <button data-action="peak-jump-current" type="button"
+                      class="px-4 py-2 rounded-xl bg-[#6D28D9] hover:bg-[#5B21B6] text-white text-xs font-extrabold shrink-0 transition">
+                      Về câu hiện tại &rarr;
+                    </button>
+                  </div>
+                ` : (peakState.statusBanner ? `
+                  <div class="p-3 rounded-xl text-xs font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${peakState.answered ? (peakState.lastCorrect ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200') : 'bg-[#F3EEFF] text-[#5B21B6] border border-[#DDD6FE]'}">
+                    <span>${escapeHtml(peakState.statusBanner)}</span>
+                    ${peakState.answered && !peakState.lastCorrect && peakState.climbedSteps < peakState.goalSteps ? `
+                      <button data-action="peak-next-step" type="button"
+                        class="px-4 py-2 rounded-xl bg-[#6D28D9] hover:bg-[#5B21B6] text-white text-xs font-extrabold shrink-0 transition">
+                        Chặng tiếp theo &rarr;
+                      </button>
+                    ` : ''}
+                  </div>
+                ` : '')}
+              </div>
+
+              <button data-action="peak-next-step" type="button" ${canPeakNext ? '' : 'disabled'} title="${isPeakReviewing ? 'Tiến về câu hiện tại' : 'Chặng tiếp theo'}"
+                class="w-9 h-12 sm:w-11 sm:h-14 rounded-2xl border flex items-center justify-center shrink-0 transition ${
+                  canPeakNext
+                    ? 'bg-white/15 hover:bg-white/25 border-white/25 text-white shadow-lg active:scale-95'
+                    : 'bg-white/5 border-white/10 text-white/25 cursor-not-allowed'
+                }">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
             </div>
-          ` : ''}
+            `;
+          })() : ''}
         </section>
       `;
     }
@@ -6876,9 +7122,16 @@
         answerPeakOption(actEl.dataset.opt);
         return;
       }
+      if (action === 'peak-prev') {
+        goPeakPrev();
+        return;
+      }
+      if (action === 'peak-jump-current') {
+        goPeakToCurrent();
+        return;
+      }
       if (action === 'peak-next-step') {
-        prepareNextPeakQuestion();
-        render();
+        goPeakNext();
         return;
       }
       if (action === 'peak-replay-audio') {
@@ -7067,19 +7320,32 @@
       if (action === 'quiz-set-topic') { state.quizTopic = actEl.dataset.topic; render(); return; }
       if (action === 'quiz-set-mode') { state.quizMode = actEl.dataset.mode; render(); return; }
       if (action === 'quiz-start') { startQuiz(); return; }
-      if (action === 'quiz-exit') { state.quizActive = false; render(); return; }
+      if (action === 'quiz-exit') { clearQuizAutoNext(); state.quizActive = false; render(); return; }
+      if (action === 'quiz-prev') { goQuizPrev(); return; }
+      if (action === 'quiz-jump-current') { goQuizToCurrent(); return; }
       if (action === 'quiz-answer') {
-        if (state.quizAnswered) return;
         const q = state.quizQuestions[state.quizIndex];
+        if (!q || q.answered || state.quizAnswered) return;
         const chosenId = actEl.dataset.opt;
+        const isRight = (chosenId === q.word.id);
+        q.answered = true;
+        q.selectedOption = chosenId;
+        q.isCorrect = isRight;
         state.quizAnswered = true;
         state.quizSelectedOption = chosenId;
-        if (chosenId === q.word.id) {
+        if (isRight) {
           state.quizScore++;
           state.learned.add(q.word.id);
           saveState();
           syncWordProgressToCloud(q.word.id);
           playChime('correct');
+          clearQuizAutoNext();
+          const answeredIdx = state.quizIndex;
+          quizAutoNextTimer = setTimeout(() => {
+            if (state.view === 'quiz' && state.quizActive && state.quizIndex === answeredIdx) {
+              goQuizNext();
+            }
+          }, 650);
         } else {
           state.quizMistakes.push(q.word);
           playChime('wrong');
@@ -7089,17 +7355,7 @@
         return;
       }
       if (action === 'quiz-next') {
-        state.quizIndex++;
-        state.quizAnswered = false;
-        state.quizSelectedOption = null;
-        if (state.quizMode === 'spelling' && state.quizIndex < state.quizQuestions.length) {
-          setupSpellingForCurrent();
-        }
-        render();
-        if (state.quizMode === 'listen2pic' && state.quizIndex < state.quizQuestions.length) {
-          const nw = state.quizQuestions[state.quizIndex].word;
-          setTimeout(() => speakText(nw.word, state.accent, state.speechRate, nw), 250);
-        }
+        goQuizNext();
         return;
       }
 
@@ -7147,18 +7403,31 @@
         return;
       }
       if (action === 'spell-check') {
-        if (state.quizAnswered) return;
         const q = state.quizQuestions[state.quizIndex];
+        if (!q || q.answered || state.quizAnswered) return;
         const targetClean = q.word.word.replace(/\s+/g, '').toLowerCase();
         const typed = state.spellPicked.map(t => t.ch).join('').toLowerCase();
+        const isRight = (typed === targetClean);
+        q.answered = true;
+        q.isCorrect = isRight;
+        q.spellTiles = state.spellTiles;
+        q.spellPicked = state.spellPicked;
+        q.spellStatus = isRight ? 'correct' : 'wrong';
         state.quizAnswered = true;
-        if (typed === targetClean) {
+        if (isRight) {
           state.spellStatus = 'correct';
           state.quizScore++;
           state.learned.add(q.word.id);
           saveState();
           syncWordProgressToCloud(q.word.id);
           playChime('correct');
+          clearQuizAutoNext();
+          const answeredIdx = state.quizIndex;
+          quizAutoNextTimer = setTimeout(() => {
+            if (state.view === 'quiz' && state.quizActive && state.quizIndex === answeredIdx) {
+              goQuizNext();
+            }
+          }, 650);
         } else {
           state.spellStatus = 'wrong';
           state.quizMistakes.push(q.word);
@@ -7176,6 +7445,14 @@
         closeVoiceModal();
         closeAuthModal();
         return;
+      }
+      if (state.view === 'quiz' && state.quizActive && state.quizIndex < state.quizQuestions.length) {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); goQuizPrev(); return; }
+        if (e.key === 'ArrowRight') { e.preventDefault(); goQuizNext(); return; }
+      }
+      if (state.view === 'games' && peakState.screen === 'play') {
+        if (e.key === 'ArrowLeft') { e.preventDefault(); goPeakPrev(); return; }
+        if (e.key === 'ArrowRight') { e.preventDefault(); goPeakNext(); return; }
       }
       if (state.view === 'quiz' && state.quizActive && state.quizMode === 'spelling' && !state.quizAnswered) {
         if (e.key === 'Backspace' && state.spellPicked.length) {
