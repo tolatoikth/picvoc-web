@@ -809,6 +809,8 @@
           quizHistory: state.quizHistory,
           bgTheme: state.bgTheme,
           matchBestTimes: state.matchBestTimes,
+          blastBestScores: state.blastBestScores,
+          peakBestScores: state.peakBestScores,
           preferredUSVoice: state.preferredUSVoice,
           preferredUKVoice: state.preferredUKVoice,
           useRealDictAudio: state.useRealDictAudio,
@@ -854,6 +856,8 @@
         ? Object.assign({ type: 'color', hue: 258, sat: 64, light: 95, liveScene: 'ocean', frozen: false, frozenTime: 12.5, speed: 1.6 }, saved.bgTheme)
         : { type: 'color', hue: 258, sat: 64, light: 95, liveScene: 'ocean', frozen: false, frozenTime: 12.5, speed: 1.6 },
       matchBestTimes: (saved.matchBestTimes && typeof saved.matchBestTimes === 'object') ? saved.matchBestTimes : {},
+      blastBestScores: (saved.blastBestScores && typeof saved.blastBestScores === 'object') ? saved.blastBestScores : {},
+      peakBestScores: (saved.peakBestScores && typeof saved.peakBestScores === 'object') ? saved.peakBestScores : { bestScore: 0, summits: 0 },
       profile: {
         nickname: (saved.profile && saved.profile.nickname) || '',
         mascot: (saved.profile && saved.profile.mascot) || 'cat',
@@ -1485,6 +1489,7 @@
 
     function setView(view, opts = {}) {
       if (chatState.open) closeMascotChat(true);
+      if (typeof stopBlastLoop === 'function') stopBlastLoop();
       state.view = view;
       if (window.innerWidth < 768 && state.sidebarOpen) toggleSidebar(false);
       if (opts.topic) state.topicFilter = opts.topic;
@@ -4849,6 +4854,12 @@
       if (matchState.screen === 'setup') return renderMatchSetup();
       if (matchState.screen === 'play') return renderMatchPlay();
       if (matchState.screen === 'win') return renderMatchWin();
+      if (blastState.screen === 'setup') return renderBlastSetup();
+      if (blastState.screen === 'play') return renderBlastPlay();
+      if (blastState.screen === 'over') return renderBlastOver();
+      if (peakState.screen === 'setup') return renderPeakSetup();
+      if (peakState.screen === 'play') return renderPeakPlay();
+      if (peakState.screen === 'win') return renderPeakWin();
 
       // Games Hub (Modern Playful 3-Game Showcase)
       const best8 = state.matchBestTimes['8_en-vi'];
@@ -4900,43 +4911,52 @@
               </div>
             </div>
 
-            <!-- Game #2: KaDoc Blast (Đợt 2) -->
-            <div class="rounded-3xl bg-white border-2 border-[#EDE5FF] shadow-xs overflow-hidden flex flex-col opacity-90">
-              <div class="aspect-[16/9] bg-gradient-to-br from-[#0F172A] via-[#1E1B4B] to-[#312E81] p-4 flex items-center justify-center relative">
+            <!-- Game #2: KaDoc Blast Pro (LIVE!) -->
+            <div class="rounded-3xl bg-white border-2 border-[#DDD6FE] shadow-md overflow-hidden flex flex-col card-hover">
+              <div class="aspect-[16/9] bg-gradient-to-br from-[#0B112B] via-[#1E1B4B] to-[#3B0764] p-4 flex items-center justify-center relative overflow-hidden">
                 <div class="flex items-center gap-3">
-                  <div class="w-14 h-14 rounded-full bg-gradient-to-br from-[#38BDF8] to-[#6366F1] flex items-center justify-center text-white text-[10px] font-black shadow-lg">Library</div>
-                  <div class="w-12 h-12 rounded-full bg-gradient-to-br from-[#F472B6] to-[#EC4899] flex items-center justify-center text-white text-[10px] font-black shadow-lg">Exam</div>
+                  <div class="w-16 h-16 rounded-full bg-gradient-to-br from-[#38BDF8] to-[#6366F1] border-2 border-sky-300/60 flex items-center justify-center text-white text-[11px] font-black shadow-lg shadow-sky-500/30 -translate-y-1">Library</div>
+                  <div class="w-14 h-14 rounded-full bg-gradient-to-br from-[#F472B6] to-[#A855F7] border-2 border-pink-300/60 flex items-center justify-center text-white text-[11px] font-black shadow-lg shadow-pink-500/30 translate-y-2">Exam</div>
+                  <div class="w-14 h-14 rounded-full bg-gradient-to-br from-[#2EF29B] to-[#0D9488] border-2 border-emerald-200/70 flex items-center justify-center text-[#160A33] text-[11px] font-black shadow-lg shadow-emerald-400/30 -translate-y-2">Polite</div>
                 </div>
-                <span class="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-white/15 text-purple-100 text-[10px] font-bold uppercase">Đợt 2 · Sắp mở</span>
+                <span class="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-[#38BDF8] text-[#0B112B] text-[10px] font-black uppercase">Đợt 2 · Chơi ngay</span>
+                ${state.blastBestScores && state.blastBestScores.normal ? `<span class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-black/40 text-[#FFCD1F] text-[10px] font-black">Top: ${state.blastBestScores.normal}</span>` : ''}
               </div>
               <div class="p-5 flex-1 flex flex-col justify-between gap-4">
                 <div>
                   <h3 class="text-lg font-extrabold text-[#160A33]">Bắn thiên thạch (Blast)</h3>
-                  <p class="text-xs text-[#5B5373] mt-1 leading-relaxed">Bắn trúng thiên thạch chứa đáp án đúng đang bay ngang không gian với tốc độ tăng dần và chuỗi combo.</p>
+                  <p class="text-xs text-[#5B5373] mt-1 leading-relaxed">Phi thuyền ngắm tia laser 60fps bắn nổ thiên thạch mang đáp án đúng, nổ hạt neon, nhân điểm combo cực đã tay.</p>
                 </div>
-                <button type="button" disabled class="w-full py-3 rounded-2xl bg-[#F3EEFF] text-[#7C3AED] font-bold text-xs cursor-not-allowed">
-                  Chuẩn bị ra mắt ở Đợt 2
+                <button data-action="blast-open-setup" type="button"
+                  class="btn-tactile w-full py-3 rounded-2xl bg-[#38BDF8] hover:bg-[#0EA5E9] border-[#0284C7] text-[#0B112B] font-extrabold text-sm flex items-center justify-center gap-2">
+                  <span>Chơi Bắn thiên thạch</span>
+                  <span>&rarr;</span>
                 </button>
               </div>
             </div>
 
-            <!-- Game #3: Mastery Peak (Đợt 3) -->
-            <div class="rounded-3xl bg-white border-2 border-[#EDE5FF] shadow-xs overflow-hidden flex flex-col opacity-90">
-              <div class="aspect-[16/9] bg-gradient-to-br from-[#064E3B] via-[#0F766E] to-[#115E59] p-4 flex items-center justify-center relative">
-                <svg class="w-24 h-24 text-[#5EEAD4]" viewBox="0 0 80 80" fill="none">
-                  <path d="M10 66 L36 20 L52 44 L60 32 L72 66 Z" fill="currentColor" opacity="0.28"/>
-                  <path d="M10 66 L36 20 L52 44 L60 32 L72 66" stroke="#34F5A5" stroke-width="3.5" stroke-linejoin="round"/>
-                  <circle cx="36" cy="18" r="5" fill="#FFCD1F"/>
+            <!-- Game #3: Mastery Peak Pro (LIVE!) -->
+            <div class="rounded-3xl bg-white border-2 border-[#DDD6FE] shadow-md overflow-hidden flex flex-col card-hover">
+              <div class="aspect-[16/9] bg-gradient-to-br from-[#064E3B] via-[#0F766E] to-[#1E1B4B] p-4 flex items-center justify-center relative overflow-hidden">
+                <svg class="w-28 h-24 text-[#5EEAD4]" viewBox="0 0 100 80" fill="none">
+                  <path d="M8 70 L42 18 L60 46 L72 30 L92 70 Z" fill="currentColor" opacity="0.24"/>
+                  <path d="M8 70 L42 18 L60 46 L72 30 L92 70" stroke="#34F5A5" stroke-width="3.5" stroke-linejoin="round"/>
+                  <path d="M42 18 L42 6 L54 10 L42 14" fill="#FFCD1F" stroke="#FFCD1F" stroke-width="1.5"/>
+                  <circle cx="28" cy="40" r="4" fill="#F472B6"/>
+                  <circle cx="42" cy="18" r="4.5" fill="#FFCD1F"/>
                 </svg>
-                <span class="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-white/15 text-emerald-100 text-[10px] font-bold uppercase">Đợt 3 · Sắp mở</span>
+                <span class="absolute top-3 left-3 px-2.5 py-0.5 rounded-full bg-[#FFCD1F] text-[#160A33] text-[10px] font-black uppercase">Đợt 3 · Chơi ngay</span>
+                ${state.peakBestScores && state.peakBestScores.summits ? `<span class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-black/40 text-[#34F5A5] text-[10px] font-black">${state.peakBestScores.summits} đỉnh</span>` : ''}
               </div>
               <div class="p-5 flex-1 flex flex-col justify-between gap-4">
                 <div>
                   <h3 class="text-lg font-extrabold text-[#160A33]">Leo núi Mastery Peak</h3>
-                  <p class="text-xs text-[#5B5373] mt-1 leading-relaxed">Chinh phục đỉnh núi nhiều chặng với thẻ kỹ năng Power-Ups (50/50, x2 điểm, khiên) và tự lặp lại câu sai.</p>
+                  <p class="text-xs text-[#5B5373] mt-1 leading-relaxed">Leo bản đồ đỉnh núi theo chặng, kích hoạt thẻ kỹ năng 50/50 · x2 Điểm · Khiên và tự động ôn lại câu sai đến khi thuộc hẳn.</p>
                 </div>
-                <button type="button" disabled class="w-full py-3 rounded-2xl bg-[#F3EEFF] text-[#7C3AED] font-bold text-xs cursor-not-allowed">
-                  Chuẩn bị ra mắt ở Đợt 3
+                <button data-action="peak-open-setup" type="button"
+                  class="btn-tactile w-full py-3 rounded-2xl bg-[#FFCD1F] hover:bg-[#F59E0B] border-[#D97706] text-[#160A33] font-extrabold text-sm flex items-center justify-center gap-2">
+                  <span>Chinh phục đỉnh núi</span>
+                  <span>&rarr;</span>
                 </button>
               </div>
             </div>
@@ -5220,6 +5240,1220 @@
             <button data-action="match-open-setup" type="button"
               class="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-bold text-sm transition">
               Đổi chủ đề / số thẻ
+            </button>
+          </div>
+        </section>
+      `;
+    }
+
+    // =========================================================
+    // 5C. KADOC BLAST PRO — 60FPS SPACE ARCADE VOCABULARY GAME
+    // =========================================================
+    const blastState = {
+      screen: 'hub',           // hub | setup | play | over
+      selectedTopics: ['education'],
+      wordFilter: 'all',       // all | unlearned
+      difficulty: 'normal',    // chill | normal | turbo
+      promptMode: 'vi2en',     // vi2en | en2vi | audio2en
+      soundOn: true,
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+      hits: 0,
+      misses: 0,
+      level: 1,
+      timeLeft: 75,
+      isNewRecord: false,
+      currentWord: null,
+      missedWords: [],
+      asteroids: [],
+      particles: [],
+      lasers: [],
+      popups: [],
+      stars: [],
+      aimX: 400,
+      aimY: 200,
+      rafId: null,
+      timerId: null,
+      lastPerf: 0,
+      pool: []
+    };
+
+    const BLAST_DIFF = {
+      chill:  { label: 'Thư giãn',  sub: '90s · Bay chậm',   duration: 90, baseSpeed: 42, count: 4 },
+      normal: { label: 'Tiêu chuẩn', sub: '75s · Tăng tốc',   duration: 75, baseSpeed: 68, count: 5 },
+      turbo:  { label: 'Siêu tốc',   sub: '60s · Rất nhanh',  duration: 60, baseSpeed: 98, count: 5 }
+    };
+
+    function playLaserSfx() {
+      if (!blastState.soundOn) return;
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        if (!window.__kadocBlastAC) window.__kadocBlastAC = new AC();
+        const c = window.__kadocBlastAC;
+        if (c.state === 'suspended') c.resume();
+        const now = c.currentTime;
+        const o = c.createOscillator();
+        const g = c.createGain();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(920, now);
+        o.frequency.exponentialRampToValueAtTime(210, now + 0.11);
+        g.gain.setValueAtTime(0.09, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        o.connect(g);
+        g.connect(c.destination);
+        o.start(now);
+        o.stop(now + 0.13);
+      } catch (e) {}
+    }
+
+    function stopBlastLoop() {
+      if (blastState.rafId) { cancelAnimationFrame(blastState.rafId); blastState.rafId = null; }
+      if (blastState.timerId) { clearInterval(blastState.timerId); blastState.timerId = null; }
+    }
+
+    function getBlastCandidatePool() {
+      const topics = blastState.selectedTopics.length ? blastState.selectedTopics : ['education'];
+      let pool = VOCAB.filter(w => topics.includes(w.topic));
+      if (blastState.wordFilter === 'unlearned') {
+        const un = pool.filter(w => !state.learned.has(w.id));
+        if (un.length >= 4) pool = un;
+      }
+      return pool;
+    }
+
+    function spawnBlastWave(canvasW, canvasH) {
+      const pool = blastState.pool;
+      if (!pool.length) return;
+      const cfg = BLAST_DIFF[blastState.difficulty] || BLAST_DIFF.normal;
+      const target = pool[Math.floor(Math.random() * pool.length)];
+      blastState.currentWord = target;
+
+      const distractors = pool.filter(w => w.id !== target.id).sort(() => Math.random() - 0.5).slice(0, cfg.count - 1);
+      const waveWords = [target, ...distractors].sort(() => Math.random() - 0.5);
+
+      const palettes = [
+        ['#38BDF8', '#3B82F6'],
+        ['#C084FC', '#7C3AED'],
+        ['#F472B6', '#DB2777'],
+        ['#34D399', '#059669'],
+        ['#FBBF24', '#EA580C']
+      ];
+      const speedMult = 1 + (blastState.level - 1) * 0.14;
+      const padX = 85;
+      const usableW = Math.max(240, canvasW - padX * 2);
+
+      blastState.asteroids = waveWords.map((w, idx) => {
+        const label = blastState.promptMode === 'en2vi' ? w.vi : w.word;
+        const r = Math.max(44, Math.min(62, 34 + Math.min(label.length, 16) * 1.65));
+        const laneX = padX + ((idx + 0.5) / waveWords.length) * usableW + (Math.random() - 0.5) * 32;
+        const laneY = 72 + (idx % 2) * 78 + Math.random() * 44;
+        const ang = (Math.random() * Math.PI * 2);
+        const spd = (cfg.baseSpeed * speedMult) * (0.85 + Math.random() * 0.35);
+        const pal = palettes[idx % palettes.length];
+        return {
+          wordObj: w,
+          isTarget: w.id === target.id,
+          label,
+          x: Math.max(r + 12, Math.min(canvasW - r - 12, laneX)),
+          y: Math.max(r + 16, Math.min(canvasH - 135, laneY)),
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd * 0.72,
+          r,
+          c1: pal[0],
+          c2: pal[1],
+          rot: Math.random() * 6.28,
+          vr: (Math.random() - 0.5) * 0.6,
+          flashWrong: 0
+        };
+      });
+
+      // Update live prompt DOM cleanly without re-rendering canvas
+      updateBlastHudDOM();
+      if (blastState.promptMode === 'audio2en') {
+        try { speakText(target.word, null, null, target); } catch (e) {}
+      }
+    }
+
+    function updateBlastHudDOM() {
+      const pEl = document.getElementById('blast-prompt-text');
+      const subEl = document.getElementById('blast-prompt-sub');
+      const scEl = document.getElementById('blast-score-val');
+      const cbEl = document.getElementById('blast-combo-badge');
+      const tmEl = document.getElementById('blast-timer-val');
+      const lvEl = document.getElementById('blast-level-val');
+      const w = blastState.currentWord;
+
+      if (pEl && w) {
+        if (blastState.promptMode === 'en2vi') pEl.textContent = w.word;
+        else if (blastState.promptMode === 'audio2en') pEl.textContent = 'Nghe & Bắn từ đúng!';
+        else pEl.textContent = w.vi;
+      }
+      if (subEl && w) {
+        subEl.textContent = blastState.promptMode === 'en2vi'
+          ? (w.ipaUS || w.pos || '')
+          : blastState.promptMode === 'audio2en'
+            ? 'Bấm loa để nghe lại'
+            : (w.pos ? `Từ loại: ${w.pos}` : 'Bắn thiên thạch chứa từ tiếng Anh');
+      }
+      if (scEl) scEl.textContent = String(blastState.score);
+      if (tmEl) tmEl.textContent = blastState.timeLeft + 's';
+      if (lvEl) lvEl.textContent = 'Lv.' + blastState.level;
+      if (cbEl) {
+        if (blastState.combo >= 2) {
+          cbEl.classList.remove('hidden');
+          cbEl.textContent = `Combo x${blastState.combo}!`;
+        } else {
+          cbEl.classList.add('hidden');
+        }
+      }
+    }
+
+    function fireBlastAt(clickX, clickY, canvasW, canvasH) {
+      if (blastState.screen !== 'play') return;
+      const turretX = canvasW / 2;
+      const turretY = canvasH - 34;
+      blastState.aimX = clickX;
+      blastState.aimY = clickY;
+      playLaserSfx();
+
+      // Check hit from top-most asteroid
+      let hitAst = null;
+      for (let i = blastState.asteroids.length - 1; i >= 0; i--) {
+        const a = blastState.asteroids[i];
+        const dist = Math.hypot(clickX - a.x, clickY - a.y);
+        if (dist <= a.r + 8) {
+          hitAst = a;
+          break;
+        }
+      }
+
+      const laserColor = !hitAst ? '#38BDF8' : (hitAst.isTarget ? '#2EF29B' : '#FB7185');
+      blastState.lasers.push({
+        x1: turretX, y1: turretY - 14,
+        x2: hitAst ? hitAst.x : clickX,
+        y2: hitAst ? hitAst.y : clickY,
+        color: laserColor,
+        life: 1.0
+      });
+
+      if (!hitAst) return;
+
+      if (hitAst.isTarget) {
+        blastState.hits += 1;
+        blastState.combo += 1;
+        if (blastState.combo > blastState.maxCombo) blastState.maxCombo = blastState.combo;
+        blastState.level = 1 + Math.floor(blastState.hits / 5);
+        const pts = 100 + Math.min(blastState.combo - 1, 8) * 25;
+        blastState.score += pts;
+
+        matchState.soundOn = blastState.soundOn;
+        gameSfx.match(blastState.combo);
+        if (blastState.promptMode !== 'audio2en') {
+          try { speakText(hitAst.wordObj.word, null, null, hitAst.wordObj); } catch (e) {}
+        }
+
+        // Neon explosion particles!
+        for (let p = 0; p < 26; p++) {
+          const ang = Math.random() * Math.PI * 2;
+          const spd = 2.5 + Math.random() * 6.5;
+          blastState.particles.push({
+            x: hitAst.x, y: hitAst.y,
+            vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+            r: 2.5 + Math.random() * 4.5,
+            col: p % 3 === 0 ? '#2EF29B' : p % 3 === 1 ? hitAst.c1 : '#FFCD1F',
+            life: 1.0
+          });
+        }
+        blastState.popups.push({
+          x: hitAst.x, y: hitAst.y - 12,
+          text: blastState.combo >= 2 ? `+${pts} (x${blastState.combo})` : `+${pts}`,
+          color: '#2EF29B',
+          life: 1.0
+        });
+
+        spawnBlastWave(canvasW, canvasH);
+      } else {
+        blastState.misses += 1;
+        blastState.combo = 0;
+        blastState.score = Math.max(0, blastState.score - 25);
+        hitAst.flashWrong = 1.0;
+        if (blastState.currentWord && !blastState.missedWords.some(m => m.id === blastState.currentWord.id)) {
+          blastState.missedWords.push(blastState.currentWord);
+        }
+        matchState.soundOn = blastState.soundOn;
+        gameSfx.wrong();
+        blastState.popups.push({
+          x: hitAst.x, y: hitAst.y - 12,
+          text: '-25',
+          color: '#FB7185',
+          life: 1.0
+        });
+        updateBlastHudDOM();
+      }
+    }
+
+    function initBlastCanvasAndLoop() {
+      const cv = document.getElementById('blast-canvas');
+      if (!cv) return;
+      const rect = cv.getBoundingClientRect();
+      cv.width = Math.max(320, Math.round(rect.width));
+      cv.height = Math.max(380, Math.round(rect.height));
+
+      if (!blastState.stars.length) {
+        blastState.stars = Array.from({ length: 65 }, () => ({
+          x: Math.random() * cv.width,
+          y: Math.random() * cv.height,
+          r: 0.8 + Math.random() * 2.0,
+          sp: 10 + Math.random() * 26,
+          ph: Math.random() * 6.28
+        }));
+      }
+      blastState.aimX = cv.width / 2;
+      blastState.aimY = cv.height * 0.35;
+
+      spawnBlastWave(cv.width, cv.height);
+
+      cv.onmousemove = (ev) => {
+        const r = cv.getBoundingClientRect();
+        blastState.aimX = ev.clientX - r.left;
+        blastState.aimY = ev.clientY - r.top;
+      };
+      cv.onmousedown = (ev) => {
+        const r = cv.getBoundingClientRect();
+        fireBlastAt(ev.clientX - r.left, ev.clientY - r.top, cv.width, cv.height);
+      };
+      cv.ontouchstart = (ev) => {
+        if (!ev.touches || !ev.touches[0]) return;
+        ev.preventDefault();
+        const r = cv.getBoundingClientRect();
+        fireBlastAt(ev.touches[0].clientX - r.left, ev.touches[0].clientY - r.top, cv.width, cv.height);
+      };
+
+      const ctx = cv.getContext('2d');
+      blastState.lastPerf = performance.now();
+
+      function drawFrame(now) {
+        if (blastState.screen !== 'play' || state.view !== 'games') {
+          stopBlastLoop();
+          return;
+        }
+        const dt = Math.min(0.05, (now - blastState.lastPerf) * 0.001);
+        blastState.lastPerf = now;
+        const W = cv.width, H = cv.height;
+
+        // Space Nebula Background
+        const bg = ctx.createLinearGradient(0, 0, 0, H);
+        bg.addColorStop(0, '#07091F');
+        bg.addColorStop(0.55, '#160B38');
+        bg.addColorStop(1, '#261054');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, W, H);
+
+        // Twinkling Parallax Stars
+        blastState.stars.forEach(s => {
+          s.y += s.sp * dt;
+          if (s.y > H) { s.y = 0; s.x = Math.random() * W; }
+          const a = 0.35 + 0.6 * Math.abs(Math.sin(now * 0.002 + s.ph));
+          ctx.fillStyle = `rgba(224,231,255,${a.toFixed(2)})`;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // Update & Draw Glowing Neon Asteroids
+        const maxY = H - 108;
+        blastState.asteroids.forEach(a => {
+          a.x += a.vx * dt;
+          a.y += a.vy * dt;
+          a.rot += a.vr * dt;
+          if (a.flashWrong > 0) a.flashWrong = Math.max(0, a.flashWrong - dt * 3.5);
+          if (a.x < a.r + 10) { a.x = a.r + 10; a.vx = Math.abs(a.vx); }
+          if (a.x > W - a.r - 10) { a.x = W - a.r - 10; a.vx = -Math.abs(a.vx); }
+          if (a.y < a.r + 12) { a.y = a.r + 12; a.vy = Math.abs(a.vy); }
+          if (a.y > maxY - a.r) { a.y = maxY - a.r; a.vy = -Math.abs(a.vy); }
+
+          // Soft outer glow
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(a.x, a.y, a.r + 6, 0, Math.PI * 2);
+          ctx.fillStyle = a.flashWrong > 0 ? 'rgba(244,63,94,0.35)' : 'rgba(167,139,250,0.16)';
+          ctx.fill();
+
+          // Main gradient orb
+          const og = ctx.createRadialGradient(a.x - a.r * 0.3, a.y - a.r * 0.3, a.r * 0.15, a.x, a.y, a.r);
+          og.addColorStop(0, a.flashWrong > 0 ? '#FDA4AF' : a.c1);
+          og.addColorStop(1, a.flashWrong > 0 ? '#E11D48' : a.c2);
+          ctx.beginPath();
+          ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2);
+          ctx.fillStyle = og;
+          ctx.fill();
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+          ctx.stroke();
+
+          // Word label wrapped cleanly inside orb
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = '800 13px "Plus Jakarta Sans", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const words = a.label.split(' ');
+          if (words.length >= 2 && a.label.length > 10) {
+            const mid = Math.ceil(words.length / 2);
+            const l1 = words.slice(0, mid).join(' ');
+            const l2 = words.slice(mid).join(' ');
+            ctx.fillText(l1, a.x, a.y - 8, a.r * 1.75);
+            ctx.fillText(l2, a.x, a.y + 9, a.r * 1.75);
+          } else {
+            ctx.fillText(a.label, a.x, a.y, a.r * 1.75);
+          }
+          ctx.restore();
+        });
+
+        // Laser beams
+        blastState.lasers = blastState.lasers.filter(l => {
+          l.life -= dt * 6.5;
+          if (l.life <= 0) return false;
+          ctx.save();
+          ctx.globalAlpha = l.life;
+          ctx.strokeStyle = l.color;
+          ctx.lineWidth = 5 * l.life;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(l.x1, l.y1);
+          ctx.lineTo(l.x2, l.y2);
+          ctx.stroke();
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 2 * l.life;
+          ctx.stroke();
+          ctx.restore();
+          return true;
+        });
+
+        // Explosion Particles
+        blastState.particles = blastState.particles.filter(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vx *= 0.96;
+          p.vy *= 0.96;
+          p.life -= dt * 2.2;
+          if (p.life <= 0) return false;
+          ctx.save();
+          ctx.globalAlpha = p.life;
+          ctx.fillStyle = p.col;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          return true;
+        });
+
+        // Floating Score Popups
+        blastState.popups = blastState.popups.filter(pop => {
+          pop.y -= 42 * dt;
+          pop.life -= dt * 1.4;
+          if (pop.life <= 0) return false;
+          ctx.save();
+          ctx.globalAlpha = pop.life;
+          ctx.font = '900 18px "Plus Jakarta Sans", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = pop.color;
+          ctx.fillText(pop.text, pop.x, pop.y);
+          ctx.restore();
+          return true;
+        });
+
+        // Aiming Cyber Spaceship Turret at Bottom Center
+        const tx = W / 2, ty = H - 30;
+        const aimAngle = Math.atan2(blastState.aimY - ty, blastState.aimX - tx) + Math.PI / 2;
+        ctx.save();
+        ctx.translate(tx, ty);
+        ctx.rotate(Math.max(-1.25, Math.min(1.25, aimAngle)));
+        // Glow base
+        ctx.fillStyle = 'rgba(46,242,155,0.22)';
+        ctx.beginPath();
+        ctx.arc(0, 0, 28, 0, Math.PI * 2);
+        ctx.fill();
+        // Spaceship hull
+        ctx.fillStyle = '#E0E7FF';
+        ctx.beginPath();
+        ctx.moveTo(0, -24);
+        ctx.lineTo(18, 14);
+        ctx.lineTo(0, 7);
+        ctx.lineTo(-18, 14);
+        ctx.closePath();
+        ctx.fill();
+        // Neon cockpit
+        ctx.fillStyle = '#2EF29B';
+        ctx.beginPath();
+        ctx.arc(0, -4, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        blastState.rafId = requestAnimationFrame(drawFrame);
+      }
+
+      blastState.rafId = requestAnimationFrame(drawFrame);
+    }
+
+    function startBlastGame() {
+      stopBlastLoop();
+      const pool = getBlastCandidatePool();
+      if (pool.length < 4) {
+        showToast('Cần ít nhất 4 từ vựng để chơi Bắn thiên thạch! Hãy chọn thêm chủ đề.');
+        return;
+      }
+      const cfg = BLAST_DIFF[blastState.difficulty] || BLAST_DIFF.normal;
+      blastState.pool = pool;
+      blastState.score = 0;
+      blastState.combo = 0;
+      blastState.maxCombo = 0;
+      blastState.hits = 0;
+      blastState.misses = 0;
+      blastState.level = 1;
+      blastState.timeLeft = cfg.duration;
+      blastState.isNewRecord = false;
+      blastState.missedWords = [];
+      blastState.particles = [];
+      blastState.lasers = [];
+      blastState.popups = [];
+      blastState.stars = [];
+      blastState.screen = 'play';
+      matchState.screen = 'hub';
+
+      render();
+      setTimeout(() => {
+        initBlastCanvasAndLoop();
+        blastState.timerId = setInterval(() => {
+          if (blastState.screen !== 'play' || state.view !== 'games') {
+            stopBlastLoop();
+            return;
+          }
+          blastState.timeLeft -= 1;
+          updateBlastHudDOM();
+          if (blastState.timeLeft <= 0) {
+            stopBlastLoop();
+            const dKey = blastState.difficulty;
+            const prevBest = state.blastBestScores[dKey] || 0;
+            if (blastState.score > prevBest && blastState.score > 0) {
+              state.blastBestScores[dKey] = blastState.score;
+              blastState.isNewRecord = true;
+              saveState();
+            }
+            matchState.soundOn = blastState.soundOn;
+            gameSfx.win();
+            if (blastState.score > 0) launchVictoryConfetti();
+            blastState.screen = 'over';
+            render();
+          }
+        }, 1000);
+      }, 40);
+    }
+
+    function renderBlastSetup() {
+      const readyTopics = TOPICS.filter(t => getWordsByTopic(t.id).length > 0);
+      const selectedTopics = blastState.selectedTopics.length ? blastState.selectedTopics : (readyTopics[0] ? [readyTopics[0].id] : []);
+      const pool = getBlastCandidatePool();
+      const best = state.blastBestScores[blastState.difficulty] || 0;
+
+      return `
+        <section class="max-w-3xl mx-auto space-y-5">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <button data-action="blast-back-hub" type="button" class="text-xs font-extrabold text-[#6D28D9] hover:underline mb-1">&larr; Quay lại Sảnh Trò chơi</button>
+              <h1 class="text-2xl font-extrabold text-[#160A33] dark-adapt">Cài đặt Bắn thiên thạch (KaDoc Blast)</h1>
+            </div>
+            <button data-action="blast-toggle-sound" type="button"
+              class="px-3 py-2 rounded-xl bg-white border-2 border-[#EDE5FF] text-xs font-extrabold text-[#5B21B6]">
+              ${blastState.soundOn ? 'Âm thanh: BẬT' : 'Âm thanh: TẮT'}
+            </button>
+          </div>
+
+          <div class="bg-white rounded-3xl border-2 border-[#EDE5FF] p-5 sm:p-6 shadow-md space-y-5">
+            <!-- 1. Multi-Topic Selector -->
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-extrabold text-[#5B21B6] uppercase tracking-wider">1. Chọn chủ đề (chọn 1 hoặc nhiều chủ đề)</label>
+                <span class="text-xs font-bold text-[#5B5373]">${pool.length} từ sẵn sàng</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                ${readyTopics.map(t => {
+                  const active = selectedTopics.includes(t.id);
+                  const cnt = getWordsByTopic(t.id).length;
+                  return `
+                    <button data-action="blast-toggle-topic" data-topic="${escapeAttr(t.id)}" type="button"
+                      class="px-3.5 py-2 rounded-xl border-2 text-xs font-extrabold flex items-center gap-2 transition ${
+                        active ? 'bg-[#6D28D9] border-[#6D28D9] text-white shadow-sm' : 'bg-[#F7F5FF] border-[#EDE5FF] text-[#160A33] hover:border-[#C4B5FD]'
+                      }">
+                      <span>${escapeHtml(t.name)} (${escapeHtml(t.viName)})</span>
+                      <span class="px-1.5 py-0.5 rounded-md text-[10px] ${active ? 'bg-white/20 text-white' : 'bg-white text-[#6D28D9]'}">${cnt} từ</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- 2. Difficulty / Speed -->
+            <div class="space-y-2.5">
+              <label class="block text-xs font-extrabold text-[#5B21B6] uppercase tracking-wider">2. Tốc độ thiên thạch &amp; Thời gian</label>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                ${Object.entries(BLAST_DIFF).map(([id, cfg]) => `
+                  <button data-action="blast-set-diff" data-diff="${id}" type="button"
+                    class="p-3 rounded-2xl border-2 text-left transition ${blastState.difficulty === id ? 'bg-[#F3EEFF] border-[#6D28D9]' : 'bg-[#F9F8FF] border-[#EDE5FF] hover:border-[#C4B5FD]'}">
+                    <div class="text-sm font-extrabold text-[#160A33]">${cfg.label}</div>
+                    <div class="text-[11px] text-[#5B5373] mt-0.5">${cfg.sub}</div>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- 3. Prompt Mode & Filter -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <label class="block text-xs font-extrabold text-[#5B21B6] uppercase tracking-wider">3. Kiểu bắn</label>
+                <div class="grid grid-cols-3 gap-2">
+                  ${[
+                    { id: 'vi2en', label: 'Việt → Anh' },
+                    { id: 'en2vi', label: 'Anh → Việt' },
+                    { id: 'audio2en', label: 'Nghe → Anh' }
+                  ].map(m => `
+                    <button data-action="blast-set-mode" data-mode="${m.id}" type="button"
+                      class="py-2.5 px-2 rounded-xl border-2 text-xs font-extrabold text-center transition ${
+                        blastState.promptMode === m.id ? 'bg-[#6D28D9] border-[#6D28D9] text-white' : 'bg-[#F7F5FF] border-[#EDE5FF] text-[#160A33]'
+                      }">${m.label}</button>
+                  `).join('')}
+                </div>
+              </div>
+              <div class="space-y-2">
+                <label class="block text-xs font-extrabold text-[#5B21B6] uppercase tracking-wider">4. Nguồn từ</label>
+                <div class="grid grid-cols-2 gap-2">
+                  ${[
+                    { id: 'all', label: 'Tất cả từ' },
+                    { id: 'unlearned', label: 'Ưu tiên chưa thuộc' }
+                  ].map(f => `
+                    <button data-action="blast-set-filter" data-filter="${f.id}" type="button"
+                      class="py-2.5 px-2 rounded-xl border-2 text-xs font-extrabold text-center transition ${
+                        blastState.wordFilter === f.id ? 'bg-[#6D28D9] border-[#6D28D9] text-white' : 'bg-[#F7F5FF] border-[#EDE5FF] text-[#160A33]'
+                      }">${f.label}</button>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#EDE5FF]">
+              <div class="text-xs font-semibold text-[#5B5373]">
+                Kỷ lục mức này: <strong class="text-[#6D28D9]">${best} điểm</strong> · Bắn trúng cộng điểm + nhân Combo!
+              </div>
+              <button data-action="blast-start-now" type="button"
+                class="btn-tactile w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[#38BDF8] hover:bg-[#0EA5E9] border-[#0284C7] text-[#0B112B] font-extrabold text-sm shadow-lg shadow-sky-500/20">
+                Phóng phi thuyền ngay &rarr;
+              </button>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderBlastPlay() {
+      return `
+        <section class="rounded-3xl bg-[#0B112B] p-3 sm:p-5 text-white shadow-2xl border border-purple-400/25 space-y-3">
+          <!-- Arcade HUD -->
+          <div class="flex flex-wrap items-center justify-between gap-2.5">
+            <div class="flex items-center gap-2">
+              <div class="px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 text-xs font-black text-[#34F5A5]">
+                Điểm: <span id="blast-score-val" class="text-sm">${blastState.score}</span>
+              </div>
+              <div class="px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 text-xs font-black text-[#FFCD1F]">
+                <span id="blast-timer-val">${blastState.timeLeft}s</span>
+              </div>
+              <div id="blast-level-val" class="px-2.5 py-1.5 rounded-xl bg-purple-500/30 border border-purple-400/30 text-xs font-black text-purple-100">
+                Lv.${blastState.level}
+              </div>
+              <div id="blast-combo-badge" class="hidden px-2.5 py-1 rounded-xl bg-[#FFCD1F] text-[#0B112B] text-xs font-black animate-bounce">
+                Combo x2!
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button data-action="blast-toggle-sound" type="button" class="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold transition">
+                ${blastState.soundOn ? 'Âm: Bật' : 'Âm: Tắt'}
+              </button>
+              <button data-action="blast-start-now" type="button" class="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold transition">
+                Chơi lại
+              </button>
+              <button data-action="blast-open-setup" type="button" class="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-rose-500/80 text-xs font-bold transition">
+                Thoát
+              </button>
+            </div>
+          </div>
+
+          <!-- Target Prompt Bar -->
+          <div class="rounded-2xl bg-gradient-to-r from-[#4C1D95] via-[#6D28D9] to-[#4C1D95] border border-purple-300/30 px-4 py-3 flex items-center justify-between gap-3 shadow-lg">
+            <div class="min-w-0">
+              <div class="text-[10px] font-bold uppercase tracking-wider text-purple-200">Mục tiêu cần bắn</div>
+              <div id="blast-prompt-text" class="text-lg sm:text-xl font-extrabold text-white truncate">Đang chuẩn bị...</div>
+              <div id="blast-prompt-sub" class="text-[11px] text-[#34F5A5] font-semibold"></div>
+            </div>
+            <button data-action="blast-replay-audio" type="button" title="Nghe phát âm mục tiêu"
+              class="w-11 h-11 rounded-2xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center shrink-0 transition">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
+            </button>
+          </div>
+
+          <!-- 60fps Space Canvas -->
+          <div class="relative w-full h-[410px] sm:h-[470px] rounded-2xl overflow-hidden border border-purple-400/25 cursor-crosshair select-none touch-none">
+            <canvas id="blast-canvas" class="w-full h-full block"></canvas>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderBlastOver() {
+      const totalShots = blastState.hits + blastState.misses;
+      const acc = totalShots ? Math.round((blastState.hits / totalShots) * 100) : 0;
+      const best = state.blastBestScores[blastState.difficulty] || blastState.score;
+
+      return `
+        <section class="max-w-xl mx-auto rounded-3xl bg-gradient-to-br from-[#160B38] via-[#3B0764] to-[#5B21B6] p-6 sm:p-8 text-white text-center shadow-2xl border border-purple-300/25 space-y-5 animate-pop">
+          <div class="w-16 h-16 rounded-3xl bg-[#38BDF8] text-[#0B112B] mx-auto flex items-center justify-center shadow-lg">
+            <svg class="w-9 h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>
+          </div>
+          <div>
+            ${blastState.isNewRecord ? `<span class="inline-block px-3 py-1 rounded-full bg-[#2EF29B] text-[#160A33] text-[11px] font-black uppercase mb-2">Kỷ lục mới!</span>` : ''}
+            <h2 class="text-2xl sm:text-3xl font-extrabold">Kết thúc trận Bắn thiên thạch!</h2>
+            <p class="text-purple-100/85 text-xs sm:text-sm mt-1">Bạn đã bắn hạ <strong>${blastState.hits}</strong> thiên thạch từ vựng (Đạt Lv.${blastState.level})</p>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div class="rounded-2xl bg-white/12 border border-white/15 p-3">
+              <div class="text-[10px] font-bold uppercase text-purple-200">Tổng điểm</div>
+              <div class="text-2xl font-extrabold text-[#34F5A5] mt-0.5">${blastState.score}</div>
+            </div>
+            <div class="rounded-2xl bg-white/12 border border-white/15 p-3">
+              <div class="text-[10px] font-bold uppercase text-purple-200">Chính xác</div>
+              <div class="text-2xl font-extrabold text-white mt-0.5">${acc}%</div>
+            </div>
+            <div class="rounded-2xl bg-white/12 border border-white/15 p-3">
+              <div class="text-[10px] font-bold uppercase text-purple-200">Combo max</div>
+              <div class="text-2xl font-extrabold text-[#FFCD1F] mt-0.5">x${blastState.maxCombo}</div>
+            </div>
+            <div class="rounded-2xl bg-white/12 border border-white/15 p-3">
+              <div class="text-[10px] font-bold uppercase text-purple-200">Kỷ lục</div>
+              <div class="text-2xl font-extrabold text-[#38BDF8] mt-0.5">${best}</div>
+            </div>
+          </div>
+
+          ${blastState.missedWords.length ? `
+            <div class="text-left rounded-2xl bg-black/25 border border-white/10 p-3.5 space-y-2">
+              <div class="text-[11px] font-extrabold text-rose-300 uppercase tracking-wider">Từ bắn nhầm cần ôn lại (${blastState.missedWords.length})</div>
+              <div class="flex flex-wrap gap-1.5">
+                ${blastState.missedWords.slice(0, 8).map(w => `
+                  <button data-action="open-modal" data-id="${escapeAttr(w.id)}" type="button"
+                    class="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold text-white transition">
+                    ${escapeHtml(w.word)} — <span class="font-normal text-purple-200">${escapeHtml(w.vi)}</span>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
+            <button data-action="blast-start-now" type="button"
+              class="btn-tactile flex-1 py-3.5 rounded-2xl bg-[#38BDF8] hover:bg-[#0EA5E9] border-[#0284C7] text-[#0B112B] font-extrabold text-sm">
+              Bắn tiếp ván mới
+            </button>
+            <button data-action="blast-open-setup" type="button"
+              class="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-bold text-sm transition">
+              Đổi chủ đề / tốc độ
+            </button>
+          </div>
+        </section>
+      `;
+    }
+
+    // =========================================================
+    // 5D. KADOC MASTERY PEAK — MOUNTAIN CLIMB + POWER-UPS + SPACED RETRY
+    // =========================================================
+    const peakState = {
+      screen: 'hub',          // hub | setup | play | win
+      selectedTopics: ['education'],
+      mountainId: 'snow',     // cloud (10) | snow (15) | everest (20)
+      mode: 'mixed',          // mixed | vi2en | audio2vi
+      soundOn: true,
+      goalSteps: 15,
+      climbedSteps: 0,
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+      attempts: 0,
+      correctCount: 0,
+      retriedMastered: 0,
+      queue: [],              // { wordObj, isRetry, qType }
+      currentItem: null,
+      options: [],            // { id, label, sub, isCorrect, eliminated }
+      answered: false,
+      pickedId: null,
+      lastCorrect: false,
+      powerUps: { fifty: 2, double: 2, shield: 1 },
+      activeDouble: false,
+      activeShield: false,
+      statusBanner: '',
+      isNewRecord: false,
+      pool: []
+    };
+
+    const PEAK_MOUNTAINS = {
+      cloud:   { name: 'Đỉnh Mây',     steps: 10, alt: 3143, sub: '10 chặng · Khởi động nhanh' },
+      snow:    { name: 'Đỉnh Tuyết',   steps: 15, alt: 5895, sub: '15 chặng · Tiêu chuẩn' },
+      everest: { name: 'Đỉnh Everest', steps: 20, alt: 8848, sub: '20 chặng · Đại cao thủ' }
+    };
+
+    function getPeakPool() {
+      const topics = peakState.selectedTopics.length ? peakState.selectedTopics : ['education'];
+      return VOCAB.filter(w => topics.includes(w.topic));
+    }
+
+    function prepareNextPeakQuestion() {
+      if (!peakState.queue.length) {
+        // Refill if somehow empty before reaching summit
+        const extra = [...peakState.pool].sort(() => Math.random() - 0.5).slice(0, 6);
+        extra.forEach(w => peakState.queue.push({ wordObj: w, isRetry: false }));
+      }
+      const item = peakState.queue.shift();
+      const qType = peakState.mode === 'mixed'
+        ? (Math.random() < 0.35 ? 'audio2vi' : (Math.random() < 0.5 ? 'vi2en' : 'en2vi'))
+        : peakState.mode;
+      item.qType = qType;
+      peakState.currentItem = item;
+      peakState.answered = false;
+      peakState.pickedId = null;
+      peakState.lastCorrect = false;
+      peakState.activeDouble = false;
+      peakState.activeShield = false;
+      peakState.statusBanner = '';
+
+      const w = item.wordObj;
+      const distractors = peakState.pool
+        .filter(x => x.id !== w.id)
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3);
+      const opts = [w, ...distractors].sort(() => Math.random() - 0.5).map(x => ({
+        id: x.id,
+        label: qType === 'vi2en' ? x.word : x.vi,
+        sub: qType === 'vi2en' ? (x.pos || '') : '',
+        isCorrect: x.id === w.id,
+        eliminated: false
+      }));
+      peakState.options = opts;
+
+      if (qType === 'audio2vi') {
+        setTimeout(() => {
+          try { speakText(w.word, null, null, w); } catch (e) {}
+        }, 120);
+      }
+    }
+
+    function startPeakGame() {
+      const pool = getPeakPool();
+      if (pool.length < 4) {
+        showToast('Cần ít nhất 4 từ vựng để leo núi Mastery Peak! Hãy chọn thêm chủ đề.');
+        return;
+      }
+      const mCfg = PEAK_MOUNTAINS[peakState.mountainId] || PEAK_MOUNTAINS.snow;
+      peakState.pool = pool;
+      peakState.goalSteps = Math.min(mCfg.steps, pool.length);
+      peakState.climbedSteps = 0;
+      peakState.score = 0;
+      peakState.combo = 0;
+      peakState.maxCombo = 0;
+      peakState.attempts = 0;
+      peakState.correctCount = 0;
+      peakState.retriedMastered = 0;
+      peakState.powerUps = { fifty: 2, double: 2, shield: 1 };
+      peakState.isNewRecord = false;
+
+      // Prioritize unlearned words first for real mastery!
+      const unlearned = pool.filter(w => !state.learned.has(w.id)).sort(() => Math.random() - 0.5);
+      const learned = pool.filter(w => state.learned.has(w.id)).sort(() => Math.random() - 0.5);
+      const deck = [...unlearned, ...learned].slice(0, peakState.goalSteps);
+      peakState.queue = deck.map(w => ({ wordObj: w, isRetry: false }));
+
+      matchState.screen = 'hub';
+      blastState.screen = 'hub';
+      peakState.screen = 'play';
+      prepareNextPeakQuestion();
+      render();
+    }
+
+    function usePeakPowerUp(kind) {
+      if (peakState.screen !== 'play' || peakState.answered) return;
+      if (kind === 'fifty' && peakState.powerUps.fifty > 0) {
+        const wrongOpts = peakState.options.filter(o => !o.isCorrect && !o.eliminated);
+        if (wrongOpts.length < 2) return;
+        wrongOpts.sort(() => Math.random() - 0.5).slice(0, 2).forEach(o => { o.eliminated = true; });
+        peakState.powerUps.fifty -= 1;
+        peakState.statusBanner = 'Đã kích hoạt 50/50 — loại bỏ 2 đáp án nhiễu!';
+        matchState.soundOn = peakState.soundOn;
+        gameSfx.pick();
+        render();
+      } else if (kind === 'double' && peakState.powerUps.double > 0 && !peakState.activeDouble) {
+        peakState.powerUps.double -= 1;
+        peakState.activeDouble = true;
+        peakState.statusBanner = 'Đã bật x2 Điểm cho câu này!';
+        matchState.soundOn = peakState.soundOn;
+        gameSfx.pick();
+        render();
+      } else if (kind === 'shield' && peakState.powerUps.shield > 0 && !peakState.activeShield) {
+        peakState.powerUps.shield -= 1;
+        peakState.activeShield = true;
+        peakState.statusBanner = 'Đã bật Khiên bảo vệ chuỗi Combo!';
+        matchState.soundOn = peakState.soundOn;
+        gameSfx.pick();
+        render();
+      }
+    }
+
+    function answerPeakOption(optId) {
+      if (peakState.screen !== 'play' || peakState.answered) return;
+      const opt = peakState.options.find(o => o.id === optId);
+      if (!opt || opt.eliminated) return;
+
+      peakState.answered = true;
+      peakState.pickedId = optId;
+      peakState.attempts += 1;
+      matchState.soundOn = peakState.soundOn;
+      const curW = peakState.currentItem.wordObj;
+
+      if (opt.isCorrect) {
+        peakState.lastCorrect = true;
+        peakState.correctCount += 1;
+        peakState.combo += 1;
+        if (peakState.combo > peakState.maxCombo) peakState.maxCombo = peakState.combo;
+        if (peakState.currentItem.isRetry) peakState.retriedMastered += 1;
+
+        const basePts = 100 + Math.min(peakState.combo - 1, 6) * 20;
+        const gained = peakState.activeDouble ? basePts * 2 : basePts;
+        peakState.score += gained;
+        peakState.climbedSteps = Math.min(peakState.goalSteps, peakState.climbedSteps + 1);
+
+        // Reward a random Power-Up every 4-streak!
+        let bonusNote = '';
+        if (peakState.combo > 0 && peakState.combo % 4 === 0) {
+          const keys = ['fifty', 'double', 'shield'];
+          const pick = keys[Math.floor(Math.random() * keys.length)];
+          peakState.powerUps[pick] += 1;
+          const names = { fifty: '50/50', double: 'x2 Điểm', shield: 'Khiên' };
+          bonusNote = ` · Thưởng +1 thẻ ${names[pick]}!`;
+        }
+        peakState.statusBanner = `Chính xác! +${gained} điểm · Leo thêm 1 chặng${bonusNote}`;
+        gameSfx.match(peakState.combo);
+        try { speakText(curW.word, null, null, curW); } catch (e) {}
+
+        // Check Summit Reached!
+        if (peakState.climbedSteps >= peakState.goalSteps) {
+          const prev = state.peakBestScores || { bestScore: 0, summits: 0 };
+          const nextSummits = (prev.summits || 0) + 1;
+          const isRec = peakState.score > (prev.bestScore || 0);
+          state.peakBestScores = {
+            bestScore: Math.max(prev.bestScore || 0, peakState.score),
+            summits: nextSummits
+          };
+          peakState.isNewRecord = isRec;
+          saveState();
+          gameSfx.win();
+          launchVictoryConfetti();
+          render();
+          setTimeout(() => {
+            if (peakState.screen === 'play') {
+              peakState.screen = 'win';
+              render();
+            }
+          }, 950);
+          return;
+        }
+      } else {
+        peakState.lastCorrect = false;
+        gameSfx.wrong();
+        // Spaced Repetition: re-queue this missed word 2-3 turns later so learner truly masters it!
+        const insertAt = Math.min(peakState.queue.length, 2);
+        peakState.queue.splice(insertAt, 0, { wordObj: curW, isRetry: true });
+
+        if (peakState.activeShield) {
+          peakState.statusBanner = `Khiên đã đỡ đòn! Chuỗi Combo x${peakState.combo} được giữ nguyên — câu này sẽ quay lại ôn sau 2 lượt.`;
+        } else {
+          peakState.combo = 0;
+          peakState.statusBanner = `Chưa chính xác! Câu "${curW.word}" sẽ tự động lặp lại sau 2 lượt để bạn chinh phục lại.`;
+        }
+      }
+      render();
+    }
+
+    function renderPeakSetup() {
+      const readyTopics = TOPICS.filter(t => getWordsByTopic(t.id).length > 0);
+      const selectedTopics = peakState.selectedTopics.length ? peakState.selectedTopics : (readyTopics[0] ? [readyTopics[0].id] : []);
+      const pool = getPeakPool();
+      const stats = state.peakBestScores || { bestScore: 0, summits: 0 };
+
+      return `
+        <section class="max-w-3xl mx-auto space-y-5">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <button data-action="peak-back-hub" type="button" class="text-xs font-extrabold text-[#6D28D9] hover:underline mb-1">&larr; Quay lại Sảnh Trò chơi</button>
+              <h1 class="text-2xl font-extrabold text-[#160A33] dark-adapt">Leo núi Mastery Peak</h1>
+            </div>
+            <button data-action="peak-toggle-sound" type="button"
+              class="px-3 py-2 rounded-xl bg-white border-2 border-[#EDE5FF] text-xs font-extrabold text-[#5B21B6]">
+              ${peakState.soundOn ? 'Âm thanh: BẬT' : 'Âm thanh: TẮT'}
+            </button>
+          </div>
+
+          <div class="bg-white rounded-3xl border-2 border-[#EDE5FF] p-5 sm:p-6 shadow-md space-y-5">
+            <!-- 1. Multi-topic -->
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-extrabold text-[#5B21B6] uppercase tracking-wider">1. Chọn chủ đề chinh phục</label>
+                <span class="text-xs font-bold text-[#5B5373]">${pool.length} từ sẵn sàng</span>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                ${readyTopics.map(t => {
+                  const active = selectedTopics.includes(t.id);
+                  const cnt = getWordsByTopic(t.id).length;
+                  return `
+                    <button data-action="peak-toggle-topic" data-topic="${escapeAttr(t.id)}" type="button"
+                      class="px-3.5 py-2 rounded-xl border-2 text-xs font-extrabold flex items-center gap-2 transition ${
+                        active ? 'bg-[#6D28D9] border-[#6D28D9] text-white shadow-sm' : 'bg-[#F7F5FF] border-[#EDE5FF] text-[#160A33] hover:border-[#C4B5FD]'
+                      }">
+                      <span>${escapeHtml(t.name)} (${escapeHtml(t.viName)})</span>
+                      <span class="px-1.5 py-0.5 rounded-md text-[10px] ${active ? 'bg-white/20 text-white' : 'bg-white text-[#6D28D9]'}">${cnt} từ</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- 2. Mountain Peak Length -->
+            <div class="space-y-2.5">
+              <label class="block text-xs font-extrabold text-[#5B21B6] uppercase tracking-wider">2. Chọn ngọn núi muốn chinh phục</label>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                ${Object.entries(PEAK_MOUNTAINS).map(([id, m]) => `
+                  <button data-action="peak-set-mountain" data-mountain="${id}" type="button"
+                    class="p-3.5 rounded-2xl border-2 text-left transition ${peakState.mountainId === id ? 'bg-[#F3EEFF] border-[#6D28D9]' : 'bg-[#F9F8FF] border-[#EDE5FF] hover:border-[#C4B5FD]'}">
+                    <div class="flex items-center justify-between">
+                      <span class="text-sm font-extrabold text-[#160A33]">${m.name}</span>
+                      <span class="text-[11px] font-black text-[#6D28D9]">${m.alt.toLocaleString()}m</span>
+                    </div>
+                    <div class="text-[11px] text-[#5B5373] mt-0.5">${m.sub}</div>
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <!-- 3. Question Mode -->
+            <div class="space-y-2">
+              <label class="block text-xs font-extrabold text-[#5B21B6] uppercase tracking-wider">3. Kiểu câu hỏi trên chặng leo</label>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                ${[
+                  { id: 'mixed', label: 'Tổng hợp (Anh · Việt · Nghe)' },
+                  { id: 'vi2en', label: 'Nghĩa Việt → Từ Anh' },
+                  { id: 'audio2vi', label: 'Nghe phát âm → Nghĩa Việt' }
+                ].map(md => `
+                  <button data-action="peak-set-mode" data-mode="${md.id}" type="button"
+                    class="py-2.5 px-3 rounded-xl border-2 text-xs font-extrabold text-center transition ${
+                      peakState.mode === md.id ? 'bg-[#6D28D9] border-[#6D28D9] text-white' : 'bg-[#F7F5FF] border-[#EDE5FF] text-[#160A33]'
+                    }">${md.label}</button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#EDE5FF]">
+              <div class="text-xs font-semibold text-[#5B5373]">
+                Đã chinh phục: <strong class="text-[#6D28D9]">${stats.summits || 0} đỉnh</strong> · Kỷ lục: <strong class="text-[#6D28D9]">${stats.bestScore || 0} điểm</strong>
+              </div>
+              <button data-action="peak-start-now" type="button"
+                class="btn-tactile w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-[#FFCD1F] hover:bg-[#F59E0B] border-[#D97706] text-[#160A33] font-extrabold text-sm shadow-lg shadow-amber-500/20">
+                Bắt đầu leo núi ngay &rarr;
+              </button>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderPeakPlay() {
+      const mCfg = PEAK_MOUNTAINS[peakState.mountainId] || PEAK_MOUNTAINS.snow;
+      const pct = Math.round((peakState.climbedSteps / Math.max(1, peakState.goalSteps)) * 100);
+      const curAlt = Math.round((pct / 100) * mCfg.alt);
+      const item = peakState.currentItem;
+      const w = item ? item.wordObj : null;
+
+      // Climber position along SVG mountain slope (from x=36,y=118 up to summit x=260,y=24)
+      const prog = peakState.climbedSteps / Math.max(1, peakState.goalSteps);
+      const climberX = Math.round(36 + prog * 224);
+      const climberY = Math.round(118 - prog * 94 - Math.sin(prog * Math.PI) * 14);
+
+      return `
+        <section class="max-w-3xl mx-auto rounded-3xl bg-gradient-to-br from-[#0F172A] via-[#1E1B4B] to-[#3B0764] p-4 sm:p-6 text-white shadow-2xl border border-purple-400/25 space-y-4">
+          <!-- Top HUD -->
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-3 py-1.5 rounded-xl bg-white/12 border border-white/15 text-xs font-black text-[#FFCD1F]">
+                ${mCfg.name} · ${curAlt.toLocaleString()}m
+              </span>
+              <span class="px-3 py-1.5 rounded-xl bg-white/10 text-xs font-black text-[#34F5A5]">
+                Điểm: ${peakState.score}
+              </span>
+              ${peakState.combo >= 2 ? `<span class="px-2.5 py-1 rounded-xl bg-[#2EF29B] text-[#160A33] text-xs font-black">Combo x${peakState.combo}</span>` : ''}
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button data-action="peak-toggle-sound" type="button" class="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold">${peakState.soundOn ? 'Âm: Bật' : 'Âm: Tắt'}</button>
+              <button data-action="peak-open-setup" type="button" class="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-rose-500/80 text-xs font-bold">Thoát</button>
+            </div>
+          </div>
+
+          <!-- Interactive SVG Mountain Trail Map -->
+          <div class="rounded-2xl bg-black/25 border border-white/10 p-3 relative overflow-hidden">
+            <div class="flex items-center justify-between text-[11px] font-bold text-purple-200 mb-1">
+              <span>Chặng ${peakState.climbedSteps}/${peakState.goalSteps}</span>
+              <span class="text-[#34F5A5]">${pct}% đến đỉnh</span>
+            </div>
+            <svg class="w-full h-28 sm:h-32" viewBox="0 0 320 130" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="pkMtn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6D28D9" stop-opacity="0.75"/><stop offset="100%" stop-color="#0F172A" stop-opacity="0.95"/></linearGradient>
+              </defs>
+              <!-- Distant mountain silhouettes -->
+              <polygon points="0,130 90,55 170,130" fill="#312E81" opacity="0.5"/>
+              <polygon points="140,130 260,22 320,130" fill="url(#pkMtn)"/>
+              <!-- Winding climbing trail -->
+              <path d="M36 118 Q 145 56, 260 24" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="4" stroke-dasharray="6 5" stroke-linecap="round"/>
+              <!-- Golden Summit Flag -->
+              <line x1="260" y1="24" x2="260" y2="6" stroke="#FFCD1F" stroke-width="2.5"/>
+              <polygon points="260,6 278,11 260,16" fill="#FFCD1F"/>
+              <!-- Climber Glowing Marker -->
+              <circle cx="${climberX}" cy="${climberY}" r="11" fill="#2EF29B" opacity="0.28"/>
+              <circle cx="${climberX}" cy="${climberY}" r="6.5" fill="#2EF29B" stroke="#FFFFFF" stroke-width="2"/>
+            </svg>
+          </div>
+
+          <!-- Power-Ups Bar -->
+          <div class="grid grid-cols-3 gap-2">
+            <button data-action="peak-use-powerup" data-kind="fifty" type="button" ${peakState.answered || peakState.powerUps.fifty <= 0 ? 'disabled' : ''}
+              class="py-2 px-2.5 rounded-xl border text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${peakState.powerUps.fifty > 0 && !peakState.answered ? 'bg-sky-500/20 hover:bg-sky-500/35 border-sky-400/50 text-sky-200' : 'bg-white/5 border-white/10 text-white/35 cursor-not-allowed'}">
+              <span>50/50</span>
+              <span class="px-1.5 py-0.5 rounded-md bg-black/30 text-[10px]">${peakState.powerUps.fifty}</span>
+            </button>
+            <button data-action="peak-use-powerup" data-kind="double" type="button" ${peakState.answered || peakState.powerUps.double <= 0 || peakState.activeDouble ? 'disabled' : ''}
+              class="py-2 px-2.5 rounded-xl border text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${peakState.activeDouble ? 'bg-[#FFCD1F] text-[#160A33] border-[#FFCD1F]' : (peakState.powerUps.double > 0 && !peakState.answered ? 'bg-amber-500/20 hover:bg-amber-500/35 border-amber-400/50 text-amber-200' : 'bg-white/5 border-white/10 text-white/35 cursor-not-allowed')}">
+              <span>x2 Điểm</span>
+              <span class="px-1.5 py-0.5 rounded-md bg-black/30 text-[10px]">${peakState.powerUps.double}</span>
+            </button>
+            <button data-action="peak-use-powerup" data-kind="shield" type="button" ${peakState.answered || peakState.powerUps.shield <= 0 || peakState.activeShield ? 'disabled' : ''}
+              class="py-2 px-2.5 rounded-xl border text-xs font-extrabold flex items-center justify-center gap-1.5 transition ${peakState.activeShield ? 'bg-[#2EF29B] text-[#160A33] border-[#2EF29B]' : (peakState.powerUps.shield > 0 && !peakState.answered ? 'bg-emerald-500/20 hover:bg-emerald-500/35 border-emerald-400/50 text-emerald-200' : 'bg-white/5 border-white/10 text-white/35 cursor-not-allowed')}">
+              <span>Khiên</span>
+              <span class="px-1.5 py-0.5 rounded-md bg-black/30 text-[10px]">${peakState.powerUps.shield}</span>
+            </button>
+          </div>
+
+          <!-- Question Card -->
+          ${w ? `
+            <div class="rounded-2xl bg-white text-[#160A33] p-5 space-y-4 shadow-xl">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-[11px] font-extrabold uppercase tracking-wider text-[#6D28D9]">
+                      ${item.qType === 'vi2en' ? 'Chọn từ tiếng Anh đúng' : item.qType === 'audio2vi' ? 'Nghe phát âm & chọn nghĩa' : 'Chọn nghĩa tiếng Việt đúng'}
+                    </span>
+                    ${item.isRetry ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black">Ôn lại câu sai</span>` : ''}
+                  </div>
+                  <div class="text-xl sm:text-2xl font-extrabold text-[#160A33]">
+                    ${item.qType === 'vi2en' ? escapeHtml(w.vi) : item.qType === 'audio2vi' ? 'Bấm loa để nghe từ vựng' : escapeHtml(w.word)}
+                  </div>
+                  ${item.qType === 'en2vi' && w.ipaUS ? `<div class="text-xs font-semibold text-[#6D28D9] mt-0.5">${escapeHtml(w.ipaUS)} · ${escapeHtml(w.pos || '')}</div>` : ''}
+                </div>
+                ${item.qType !== 'vi2en' ? `
+                  <button data-action="peak-replay-audio" type="button"
+                    class="w-11 h-11 rounded-2xl bg-[#F3EEFF] hover:bg-[#E4DAFF] text-[#6D28D9] flex items-center justify-center shrink-0 transition">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+                  </button>
+                ` : ''}
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                ${peakState.options.map((o, idx) => {
+                  let cls = 'bg-[#F7F5FF] hover:bg-[#EDE5FF] border-[#DDD6FE] text-[#160A33]';
+                  if (o.eliminated) {
+                    cls = 'bg-slate-100 border-slate-200 text-slate-300 line-through cursor-not-allowed opacity-45';
+                  } else if (peakState.answered) {
+                    if (o.isCorrect) cls = 'bg-emerald-500 border-emerald-600 text-white shadow-md';
+                    else if (o.id === peakState.pickedId) cls = 'bg-rose-500 border-rose-600 text-white';
+                    else cls = 'bg-slate-50 border-slate-200 text-slate-400';
+                  }
+                  return `
+                    <button data-action="peak-answer" data-opt="${escapeAttr(o.id)}" type="button" ${peakState.answered || o.eliminated ? 'disabled' : ''}
+                      class="p-3.5 rounded-2xl border-2 font-extrabold text-left flex items-center justify-between gap-2 transition ${cls}">
+                      <span class="text-sm">${escapeHtml(o.label)}</span>
+                      <span class="text-[11px] font-bold opacity-65 shrink-0">${String.fromCharCode(65 + idx)}</span>
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+
+              ${peakState.statusBanner ? `
+                <div class="p-3 rounded-xl text-xs font-bold flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${peakState.answered ? (peakState.lastCorrect ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200') : 'bg-[#F3EEFF] text-[#5B21B6] border border-[#DDD6FE]'}">
+                  <span>${escapeHtml(peakState.statusBanner)}</span>
+                  ${peakState.answered && peakState.climbedSteps < peakState.goalSteps ? `
+                    <button data-action="peak-next-step" type="button"
+                      class="px-4 py-2 rounded-xl bg-[#6D28D9] hover:bg-[#5B21B6] text-white text-xs font-extrabold shrink-0 transition">
+                      Chặng tiếp theo &rarr;
+                    </button>
+                  ` : ''}
+                </div>
+              ` : ''}
+            </div>
+          ` : ''}
+        </section>
+      `;
+    }
+
+    function renderPeakWin() {
+      const mCfg = PEAK_MOUNTAINS[peakState.mountainId] || PEAK_MOUNTAINS.snow;
+      const acc = peakState.attempts ? Math.round((peakState.correctCount / peakState.attempts) * 100) : 100;
+      const title = acc >= 95 ? 'Nhà Leo Núi Thần Tốc' : peakState.retriedMastered >= 2 ? 'Chiến Binh Bền Bỉ' : peakState.maxCombo >= 6 ? 'Bậc Thầy Combo' : 'Chinh Phục Đỉnh Cao';
+
+      return `
+        <section class="max-w-xl mx-auto rounded-3xl bg-gradient-to-br from-[#064E3B] via-[#0F766E] to-[#4C1D95] p-6 sm:p-8 text-white text-center shadow-2xl border border-emerald-300/25 space-y-5 animate-pop">
+          <div class="w-16 h-16 rounded-3xl bg-[#FFCD1F] text-[#160A33] mx-auto flex items-center justify-center shadow-lg">
+            <svg class="w-9 h-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          </div>
+          <div>
+            <span class="inline-block px-3 py-1 rounded-full bg-[#2EF29B] text-[#160A33] text-[11px] font-black uppercase mb-2">Danh hiệu: ${title}</span>
+            <h2 class="text-2xl sm:text-3xl font-extrabold">Cắm cờ thành công trên ${mCfg.name}!</h2>
+            <p class="text-emerald-100/90 text-xs sm:text-sm mt-1">Độ cao ${mCfg.alt.toLocaleString()}m · Bạn đã nắm vững toàn bộ ${peakState.goalSteps} từ vựng của hành trình.</p>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2.5">
+            <div class="rounded-2xl bg-white/12 border border-white/15 p-3">
+              <div class="text-[10px] font-bold uppercase text-emerald-100">Tổng điểm</div>
+              <div class="text-2xl font-extrabold text-[#FFCD1F] mt-0.5">${peakState.score}</div>
+            </div>
+            <div class="rounded-2xl bg-white/12 border border-white/15 p-3">
+              <div class="text-[10px] font-bold uppercase text-emerald-100">Chính xác</div>
+              <div class="text-2xl font-extrabold text-[#34F5A5] mt-0.5">${acc}%</div>
+            </div>
+            <div class="rounded-2xl bg-white/12 border border-white/15 p-3">
+              <div class="text-[10px] font-bold uppercase text-emerald-100">Combo max</div>
+              <div class="text-2xl font-extrabold text-white mt-0.5">x${peakState.maxCombo}</div>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
+            <button data-action="peak-start-now" type="button"
+              class="btn-tactile flex-1 py-3.5 rounded-2xl bg-[#FFCD1F] hover:bg-[#F59E0B] border-[#D97706] text-[#160A33] font-extrabold text-sm">
+              Leo chặng mới ngay
+            </button>
+            <button data-action="peak-open-setup" type="button"
+              class="px-5 py-3.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-bold text-sm transition">
+              Chọn ngọn núi khác
             </button>
           </div>
         </section>
@@ -5525,6 +6759,133 @@
       }
       if (action === 'match-pick-card') {
         handleMatchCardClick(actEl.dataset.uid);
+        return;
+      }
+      if (action === 'blast-open-setup') {
+        stopBlastLoop();
+        matchState.screen = 'hub';
+        blastState.screen = 'setup';
+        render();
+        return;
+      }
+      if (action === 'blast-back-hub') {
+        stopBlastLoop();
+        blastState.screen = 'hub';
+        matchState.screen = 'hub';
+        render();
+        return;
+      }
+      if (action === 'blast-toggle-topic') {
+        const tid = actEl.dataset.topic;
+        if (tid) {
+          if (blastState.selectedTopics.includes(tid)) {
+            if (blastState.selectedTopics.length > 1) {
+              blastState.selectedTopics = blastState.selectedTopics.filter(x => x !== tid);
+            }
+          } else {
+            blastState.selectedTopics = [...blastState.selectedTopics, tid];
+          }
+          render();
+        }
+        return;
+      }
+      if (action === 'blast-set-diff') {
+        blastState.difficulty = actEl.dataset.diff || 'normal';
+        render();
+        return;
+      }
+      if (action === 'blast-set-mode') {
+        blastState.promptMode = actEl.dataset.mode || 'vi2en';
+        render();
+        return;
+      }
+      if (action === 'blast-set-filter') {
+        blastState.wordFilter = actEl.dataset.filter || 'all';
+        render();
+        return;
+      }
+      if (action === 'blast-toggle-sound') {
+        blastState.soundOn = !blastState.soundOn;
+        if (blastState.screen === 'setup') render();
+        else {
+          actEl.textContent = blastState.soundOn ? 'Âm: Bật' : 'Âm: Tắt';
+        }
+        return;
+      }
+      if (action === 'blast-replay-audio') {
+        if (blastState.currentWord) {
+          try { speakText(blastState.currentWord.word, null, null, blastState.currentWord); } catch (e) {}
+        }
+        return;
+      }
+      if (action === 'blast-start-now') {
+        startBlastGame();
+        return;
+      }
+      if (action === 'peak-open-setup') {
+        stopBlastLoop();
+        matchState.screen = 'hub';
+        blastState.screen = 'hub';
+        peakState.screen = 'setup';
+        render();
+        return;
+      }
+      if (action === 'peak-back-hub') {
+        peakState.screen = 'hub';
+        render();
+        return;
+      }
+      if (action === 'peak-toggle-topic') {
+        const tid = actEl.dataset.topic;
+        if (tid) {
+          if (peakState.selectedTopics.includes(tid)) {
+            if (peakState.selectedTopics.length > 1) {
+              peakState.selectedTopics = peakState.selectedTopics.filter(x => x !== tid);
+            }
+          } else {
+            peakState.selectedTopics = [...peakState.selectedTopics, tid];
+          }
+          render();
+        }
+        return;
+      }
+      if (action === 'peak-set-mountain') {
+        peakState.mountainId = actEl.dataset.mountain || 'snow';
+        render();
+        return;
+      }
+      if (action === 'peak-set-mode') {
+        peakState.mode = actEl.dataset.mode || 'mixed';
+        render();
+        return;
+      }
+      if (action === 'peak-toggle-sound') {
+        peakState.soundOn = !peakState.soundOn;
+        render();
+        return;
+      }
+      if (action === 'peak-start-now') {
+        startPeakGame();
+        return;
+      }
+      if (action === 'peak-use-powerup') {
+        usePeakPowerUp(actEl.dataset.kind);
+        return;
+      }
+      if (action === 'peak-answer') {
+        answerPeakOption(actEl.dataset.opt);
+        return;
+      }
+      if (action === 'peak-next-step') {
+        prepareNextPeakQuestion();
+        render();
+        return;
+      }
+      if (action === 'peak-replay-audio') {
+        if (peakState.currentItem && peakState.currentItem.wordObj) {
+          const w = peakState.currentItem.wordObj;
+          try { speakText(w.word, null, null, w); } catch (e) {}
+        }
         return;
       }
       if (action === 'close-auth-modal') { closeAuthModal(); return; }
