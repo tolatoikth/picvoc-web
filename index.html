@@ -6136,10 +6136,950 @@
     };
 
     const PEAK_MOUNTAINS = {
-      cloud:   { name: 'Đỉnh Mây',     steps: 10, alt: 3143, sub: '10 chặng · Khởi động nhanh' },
-      snow:    { name: 'Đỉnh Tuyết',   steps: 15, alt: 5895, sub: '15 chặng · Tiêu chuẩn' },
-      everest: { name: 'Đỉnh Everest', steps: 20, alt: 8848, sub: '20 chặng · Đại cao thủ' }
+      cloud:   {
+        name: 'Đỉnh Mây',
+        biome: 'Hoàng hôn trên mây · Linh vật bay',
+        steps: 10, alt: 3143,
+        sub: '10 chặng · Đảo mây hoàng hôn & Linh vật KaDoc',
+        arenaBg: 'from-[#1E1B4B] via-[#4C1D95] to-[#831843]',
+        borderCls: 'border-pink-400/30',
+        badgeColor: 'text-[#FDE68A]'
+      },
+      snow:    {
+        name: 'Đỉnh Tuyết',
+        biome: 'Cực quang Bắc Cực · Người tuyết nhảy',
+        steps: 15, alt: 5895,
+        sub: '15 chặng · Tuyết rơi, Cực quang & Người Tuyết',
+        arenaBg: 'from-[#020617] via-[#0B1F3A] to-[#134E4A]',
+        borderCls: 'border-cyan-400/30',
+        badgeColor: 'text-[#67E8F9]'
+      },
+      everest: {
+        name: 'Đỉnh Everest',
+        biome: 'Biển mây 8.848m · Cờ cầu nguyện',
+        steps: 20, alt: 8848,
+        sub: '20 chặng · Bão gió tầng cao & Chiến binh Hoàng Kim',
+        arenaBg: 'from-[#030712] via-[#1E1B4B] to-[#3B0764]',
+        borderCls: 'border-amber-400/35',
+        badgeColor: 'text-[#FFCD1F]'
+      }
     };
+
+    // ==================== PEAK FLYCAM 60FPS 3-BIOME STAGE ENGINE ====================
+    const peakStageEngine = (function() {
+      let rafId = null;
+      let canvas = null;
+      let lastTs = 0;
+      let elapsed = 0;
+      let curBiome = 'snow';
+      let goalSteps = 15;
+
+      let camStep = 0;
+      let targetStep = 0;
+      let jumpActive = false;
+      let jumpFrom = 0;
+      let jumpTo = 0;
+      let jumpT = 0;
+      let landSquash = 0;
+      let slipShake = 0;
+      let shieldFlash = 0;
+      let zoomPunch = 0;
+
+      let trail = [];
+      let burstParticles = [];
+      let shockwaves = [];
+      let floatTexts = [];
+      let weather = [];
+      let stars = [];
+
+      function initWeather(biome) {
+        curBiome = biome || 'snow';
+        stars = Array.from({ length: 48 }, () => ({
+          x: Math.random(),
+          y: Math.random() * 0.56,
+          r: 0.7 + Math.random() * 1.6,
+          ph: Math.random() * 6.28,
+          sp: 1.4 + Math.random() * 2.4
+        }));
+        if (curBiome === 'snow') {
+          weather = Array.from({ length: 68 }, () => ({
+            x: Math.random(),
+            y: Math.random(),
+            r: 1.2 + Math.random() * 3.2,
+            vy: 0.14 + Math.random() * 0.28,
+            vx: -0.06 - Math.random() * 0.1,
+            sway: Math.random() * 6.28,
+            alpha: 0.35 + Math.random() * 0.65
+          }));
+        } else if (curBiome === 'cloud') {
+          weather = Array.from({ length: 34 }, () => ({
+            x: Math.random(),
+            y: Math.random(),
+            r: 1.6 + Math.random() * 2.8,
+            vy: -0.05 - Math.random() * 0.08,
+            vx: 0.03 + Math.random() * 0.06,
+            sway: Math.random() * 6.28,
+            alpha: 0.4 + Math.random() * 0.55
+          }));
+        } else {
+          weather = Array.from({ length: 52 }, () => ({
+            x: Math.random(),
+            y: Math.random(),
+            len: 14 + Math.random() * 34,
+            r: 1.0 + Math.random() * 2.0,
+            vx: -0.55 - Math.random() * 0.75,
+            vy: 0.12 + Math.random() * 0.2,
+            alpha: 0.25 + Math.random() * 0.55
+          }));
+        }
+      }
+
+      function stepToScreen(stepVal, W, H, cam, zoom) {
+        const rel = stepVal - cam;
+        const baseY = H * 0.67;
+        const stepGap = H * 0.22 * zoom;
+        const sy = baseY - rel * stepGap;
+        const persp = Math.max(0.46, Math.min(1.36, 1 - rel * 0.075));
+        const swayAmp = W * 0.21 * persp;
+        const curveX = Math.sin(stepVal * 1.18 + 0.5) * swayAmp + Math.cos(stepVal * 0.45) * W * 0.04;
+        const flySwayX = Math.sin(elapsed * 0.95) * 6;
+        const flySwayY = Math.cos(elapsed * 0.75) * 3.5;
+        const sx = W * 0.5 + curveX + flySwayX;
+        return { x: sx, y: sy + flySwayY, scale: persp * zoom };
+      }
+
+      function spawnBurst(stepVal, count, biome, labelText) {
+        const colors = biome === 'snow'
+          ? ['#FFFFFF', '#67E8F9', '#2EF29B', '#BAE6FD', '#E0F2FE']
+          : biome === 'cloud'
+            ? ['#FDE68A', '#F9A8D4', '#FFFFFF', '#A78BFA', '#34F5A5']
+            : ['#FFCD1F', '#F59E0B', '#FFFFFF', '#38BDF8', '#C084FC'];
+        for (let i = 0; i < count; i++) {
+          const ang = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.35;
+          const spd = 48 + Math.random() * 145;
+          burstParticles.push({
+            step: stepVal,
+            ox: 0, oy: 0,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd - 45,
+            r: 2.2 + Math.random() * 4.2,
+            life: 1.0,
+            decay: 0.95 + Math.random() * 0.75,
+            color: colors[i % colors.length]
+          });
+        }
+        shockwaves.push({ step: stepVal, r: 6, maxR: 62, life: 1.0, color: colors[1] });
+        if (labelText) {
+          floatTexts.push({ step: stepVal, oy: -28, text: labelText, life: 1.0, color: colors[0] });
+        }
+      }
+
+      function drawSkyAndBackdrop(ctx, W, H, t, biome, prog) {
+        if (biome === 'snow') {
+          const sky = ctx.createLinearGradient(0, 0, 0, H);
+          sky.addColorStop(0, '#020617');
+          sky.addColorStop(0.5, '#0C1E3F');
+          sky.addColorStop(1, '#164E63');
+          ctx.fillStyle = sky;
+          ctx.fillRect(0, 0, W, H);
+
+          stars.forEach(s => {
+            const a = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(t * s.sp + s.ph));
+            ctx.fillStyle = `rgba(224,242,254,${a.toFixed(2)})`;
+            ctx.beginPath();
+            ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          ctx.save();
+          for (let band = 0; band < 3; band++) {
+            const g = ctx.createLinearGradient(0, H * 0.04, 0, H * 0.48);
+            if (band === 0) {
+              g.addColorStop(0, 'rgba(46,242,155,0)');
+              g.addColorStop(0.5, 'rgba(46,242,155,0.24)');
+              g.addColorStop(1, 'rgba(56,189,248,0)');
+            } else if (band === 1) {
+              g.addColorStop(0, 'rgba(56,189,248,0)');
+              g.addColorStop(0.5, 'rgba(56,189,248,0.20)');
+              g.addColorStop(1, 'rgba(168,85,247,0)');
+            } else {
+              g.addColorStop(0, 'rgba(168,85,247,0)');
+              g.addColorStop(0.5, 'rgba(168,85,247,0.16)');
+              g.addColorStop(1, 'rgba(46,242,155,0)');
+            }
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.moveTo(0, H * 0.42);
+            for (let x = 0; x <= W; x += 24) {
+              const y = H * (0.14 + band * 0.06) + Math.sin(x * 0.011 + t * (0.8 + band * 0.25) + band * 2) * 18 + Math.cos(x * 0.021 - t * 0.6) * 8;
+              ctx.lineTo(x, y);
+            }
+            ctx.lineTo(W, H * 0.55);
+            ctx.lineTo(0, H * 0.55);
+            ctx.closePath();
+            ctx.fill();
+          }
+          ctx.restore();
+
+          const py = prog * 28;
+          ctx.fillStyle = '#0F294A';
+          ctx.beginPath();
+          ctx.moveTo(0, H);
+          ctx.lineTo(W * 0.14, H * 0.34 + py);
+          ctx.lineTo(W * 0.32, H * 0.66 + py);
+          ctx.lineTo(W * 0.52, H * 0.26 + py);
+          ctx.lineTo(W * 0.74, H * 0.62 + py);
+          ctx.lineTo(W * 0.90, H * 0.30 + py);
+          ctx.lineTo(W, H * 0.58 + py);
+          ctx.lineTo(W, H);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(224,242,254,0.38)';
+          [[0.14, 0.34, 0.055], [0.52, 0.26, 0.075], [0.90, 0.30, 0.06]].forEach(([px, peakY, hw]) => {
+            ctx.beginPath();
+            ctx.moveTo(W * px, H * peakY + py);
+            ctx.lineTo(W * (px - hw), H * (peakY + 0.12) + py);
+            ctx.lineTo(W * px, H * (peakY + 0.09) + py);
+            ctx.lineTo(W * (px + hw), H * (peakY + 0.12) + py);
+            ctx.closePath();
+            ctx.fill();
+          });
+
+          const pines = [0.06, 0.11, 0.16, 0.84, 0.89, 0.94];
+          pines.forEach((px, idx) => {
+            const bx = W * px;
+            const by = H * (0.76 + (idx % 2) * 0.08) + (py * 0.4);
+            const h = 22 + (idx % 3) * 8;
+            ctx.fillStyle = 'rgba(15, 58, 74, 0.75)';
+            ctx.beginPath();
+            ctx.moveTo(bx, by - h);
+            ctx.lineTo(bx - 11, by);
+            ctx.lineTo(bx + 11, by);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = 'rgba(224,242,254,0.55)';
+            ctx.beginPath();
+            ctx.moveTo(bx, by - h);
+            ctx.lineTo(bx - 5, by - h * 0.52);
+            ctx.lineTo(bx + 5, by - h * 0.52);
+            ctx.closePath();
+            ctx.fill();
+          });
+
+        } else if (biome === 'cloud') {
+          const sky = ctx.createLinearGradient(0, 0, 0, H);
+          sky.addColorStop(0, '#1E1B4B');
+          sky.addColorStop(0.42, '#6D28D9');
+          sky.addColorStop(0.76, '#DB2777');
+          sky.addColorStop(1, '#F59E0B');
+          ctx.fillStyle = sky;
+          ctx.fillRect(0, 0, W, H);
+
+          const sunX = W * 0.78;
+          const sunY = H * 0.28;
+          ctx.save();
+          ctx.translate(sunX, sunY);
+          ctx.rotate(t * 0.12);
+          for (let r = 0; r < 10; r++) {
+            ctx.rotate(Math.PI / 5);
+            ctx.fillStyle = 'rgba(253,230,138,0.08)';
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-10, -140);
+            ctx.lineTo(10, -140);
+            ctx.closePath();
+            ctx.fill();
+          }
+          ctx.restore();
+          const sg = ctx.createRadialGradient(sunX, sunY, 4, sunX, sunY, 56);
+          sg.addColorStop(0, 'rgba(255,251,235,0.95)');
+          sg.addColorStop(0.45, 'rgba(253,224,71,0.5)');
+          sg.addColorStop(1, 'rgba(253,224,71,0)');
+          ctx.fillStyle = sg;
+          ctx.beginPath();
+          ctx.arc(sunX, sunY, 56, 0, Math.PI * 2);
+          ctx.fill();
+
+          for (let c = 0; c < 6; c++) {
+            const cx = ((c * 175 + t * (14 + c * 3)) % (W + 160)) - 80;
+            const cy = H * (0.20 + (c % 3) * 0.24);
+            ctx.fillStyle = c % 2 === 0 ? 'rgba(255,255,255,0.22)' : 'rgba(253,230,138,0.20)';
+            ctx.beginPath();
+            ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+            ctx.arc(cx + 20, cy - 8, 26, 0, Math.PI * 2);
+            ctx.arc(cx + 44, cy, 20, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          const py = prog * 24;
+          ctx.fillStyle = 'rgba(49, 46, 129, 0.55)';
+          ctx.beginPath();
+          ctx.moveTo(0, H);
+          ctx.quadraticCurveTo(W * 0.25, H * 0.45 + py, W * 0.52, H * 0.72 + py);
+          ctx.quadraticCurveTo(W * 0.78, H * 0.40 + py, W, H * 0.68 + py);
+          ctx.lineTo(W, H);
+          ctx.closePath();
+          ctx.fill();
+
+        } else {
+          const sky = ctx.createLinearGradient(0, 0, 0, H);
+          sky.addColorStop(0, '#030712');
+          sky.addColorStop(0.55, '#1E1B4B');
+          sky.addColorStop(1, '#4C1D95');
+          ctx.fillStyle = sky;
+          ctx.fillRect(0, 0, W, H);
+
+          stars.forEach(s => {
+            const a = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * s.sp * 1.2 + s.ph));
+            ctx.fillStyle = `rgba(254,243,199,${a.toFixed(2)})`;
+            ctx.beginPath();
+            ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+            ctx.fill();
+          });
+
+          const hg = ctx.createRadialGradient(W * 0.5, H * 0.85, 10, W * 0.5, H * 0.85, W * 0.65);
+          hg.addColorStop(0, 'rgba(245,158,11,0.34)');
+          hg.addColorStop(0.5, 'rgba(139,92,246,0.18)');
+          hg.addColorStop(1, 'rgba(3,7,18,0)');
+          ctx.fillStyle = hg;
+          ctx.fillRect(0, 0, W, H);
+
+          const py = prog * 30;
+          ctx.fillStyle = '#0F172A';
+          ctx.beginPath();
+          ctx.moveTo(0, H);
+          ctx.lineTo(W * 0.16, H * 0.30 + py);
+          ctx.lineTo(W * 0.28, H * 0.56 + py);
+          ctx.lineTo(W * 0.50, H * 0.18 + py);
+          ctx.lineTo(W * 0.72, H * 0.54 + py);
+          ctx.lineTo(W * 0.86, H * 0.26 + py);
+          ctx.lineTo(W, H * 0.55 + py);
+          ctx.lineTo(W, H);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.strokeStyle = 'rgba(255,205,31,0.45)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(W * 0.16, H * 0.30 + py);
+          ctx.lineTo(W * 0.28, H * 0.56 + py);
+          ctx.lineTo(W * 0.50, H * 0.18 + py);
+          ctx.lineTo(W * 0.72, H * 0.54 + py);
+          ctx.lineTo(W * 0.86, H * 0.26 + py);
+          ctx.stroke();
+
+          for (let c = 0; c < 8; c++) {
+            const cx = ((c * 130 - t * 22) % (W + 140) + W + 140) % (W + 140) - 70;
+            ctx.fillStyle = 'rgba(233,213,255,0.14)';
+            ctx.beginPath();
+            ctx.arc(cx, H - 6, 32, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      function drawLedge(ctx, p, stepIdx, currentStep, total, biome, t) {
+        const isDone = stepIdx <= currentStep;
+        const isSummit = stepIdx === total;
+        const rw = (isSummit ? 44 : 30) * p.scale;
+        const rh = (isSummit ? 14 : 10) * p.scale;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+
+        if (isDone || isSummit) {
+          const glowCol = biome === 'snow' ? 'rgba(103,232,249,0.35)' : biome === 'cloud' ? 'rgba(253,224,71,0.38)' : 'rgba(255,205,31,0.42)';
+          ctx.fillStyle = glowCol;
+          ctx.beginPath();
+          ctx.ellipse(0, 3 * p.scale, rw * 1.18, rh * 1.35, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        if (biome === 'snow') {
+          ctx.fillStyle = isDone ? '#0E7490' : '#1E3A5F';
+          ctx.beginPath();
+          ctx.ellipse(0, 5 * p.scale, rw * 0.92, rh, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = isSummit ? '#FEF08A' : (isDone ? '#F0F9FF' : '#94A3B8');
+          ctx.beginPath();
+          ctx.ellipse(0, 0, rw, rh, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = isDone ? '#67E8F9' : 'rgba(255,255,255,0.3)';
+          ctx.lineWidth = 1.6 * p.scale;
+          ctx.stroke();
+
+          if (p.scale > 0.65) {
+            ctx.fillStyle = 'rgba(186,230,253,0.75)';
+            [-0.55, 0, 0.55].forEach(frac => {
+              ctx.beginPath();
+              ctx.moveTo(rw * frac - 3 * p.scale, rh * 0.7);
+              ctx.lineTo(rw * frac + 3 * p.scale, rh * 0.7);
+              ctx.lineTo(rw * frac, rh * 1.9);
+              ctx.closePath();
+              ctx.fill();
+            });
+          }
+        } else if (biome === 'cloud') {
+          ctx.fillStyle = 'rgba(255,255,255,0.88)';
+          ctx.beginPath();
+          ctx.arc(-rw * 0.45, 3 * p.scale, rh * 1.05, 0, Math.PI * 2);
+          ctx.arc(0, 5 * p.scale, rh * 1.25, 0, Math.PI * 2);
+          ctx.arc(rw * 0.45, 3 * p.scale, rh * 1.05, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = isSummit ? '#FDE047' : (isDone ? '#34F5A5' : '#C4B5FD');
+          ctx.beginPath();
+          ctx.ellipse(0, -1 * p.scale, rw * 0.92, rh * 0.85, 0, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = '#0F172A';
+          ctx.beginPath();
+          ctx.moveTo(-rw, 0);
+          ctx.lineTo(rw, 0);
+          ctx.lineTo(rw * 0.7, rh * 2.1);
+          ctx.lineTo(-rw * 0.7, rh * 2.1);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = isSummit ? '#FFCD1F' : (isDone ? '#6D28D9' : '#334155');
+          ctx.beginPath();
+          ctx.ellipse(0, 0, rw, rh, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = isDone || isSummit ? '#FFCD1F' : 'rgba(255,255,255,0.25)';
+          ctx.lineWidth = 1.8 * p.scale;
+          ctx.stroke();
+        }
+
+        if (isSummit) {
+          const wave = Math.sin(t * 5.2) * 3.5 * p.scale;
+          ctx.strokeStyle = '#FFCD1F';
+          ctx.lineWidth = 3 * p.scale;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(0, -34 * p.scale);
+          ctx.stroke();
+
+          ctx.fillStyle = '#FFCD1F';
+          ctx.beginPath();
+          ctx.moveTo(0, -34 * p.scale);
+          ctx.quadraticCurveTo(14 * p.scale, -31 * p.scale + wave, 26 * p.scale, -26 * p.scale + wave * 0.5);
+          ctx.lineTo(0, -18 * p.scale);
+          ctx.closePath();
+          ctx.fill();
+
+          const br = (14 + Math.sin(t * 4) * 4) * p.scale;
+          ctx.strokeStyle = 'rgba(255,205,31,0.55)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, -34 * p.scale, br, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
+
+      function drawClimber(ctx, x, y, scale, biome, t, isJumping, jumpPhase, squash, shake) {
+        ctx.save();
+        const shakeX = shake > 0 ? Math.sin(t * 48) * 7 * shake : 0;
+        const idleBob = isJumping ? 0 : Math.abs(Math.sin(t * 3.8)) * 4.5 * scale;
+        ctx.translate(x + shakeX, y - idleBob);
+
+        let sx = scale;
+        let sy = scale;
+        if (isJumping) {
+          const stretch = Math.sin(jumpPhase * Math.PI);
+          sx = scale * (1 - stretch * 0.14);
+          sy = scale * (1 + stretch * 0.20);
+          ctx.rotate(Math.sin(jumpPhase * Math.PI * 2) * 0.14);
+        } else if (squash > 0.01) {
+          sx = scale * (1 + squash * 0.22);
+          sy = scale * (1 - squash * 0.18);
+        }
+        ctx.scale(sx, sy);
+
+        if (peakState.activeShield || shieldFlash > 0) {
+          ctx.strokeStyle = `rgba(46,242,155,${0.55 + Math.sin(t * 8) * 0.25})`;
+          ctx.fillStyle = 'rgba(46,242,155,0.14)';
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.arc(0, -20, 28, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+
+        const blink = (Math.sin(t * 2.1) > 0.96);
+
+        if (biome === 'snow') {
+          if (!isJumping) {
+            ctx.fillStyle = 'rgba(2,6,23,0.35)';
+            ctx.beginPath();
+            ctx.ellipse(0, 2, 16, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          const wave1 = Math.sin(t * 8.5) * 4;
+          const wave2 = Math.cos(t * 7.2) * 5;
+          ctx.strokeStyle = '#EF4444';
+          ctx.lineWidth = 5.5;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(-6, -24);
+          ctx.quadraticCurveTo(-18, -22 + wave1, -28, -16 + wave2);
+          ctx.stroke();
+          ctx.strokeStyle = '#FCD34D';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(-24, -18 + wave2 * 0.8);
+          ctx.lineTo(-27, -16.5 + wave2);
+          ctx.stroke();
+
+          const bGrad = ctx.createRadialGradient(-4, -14, 2, 0, -10, 17);
+          bGrad.addColorStop(0, '#FFFFFF');
+          bGrad.addColorStop(0.72, '#E0F2FE');
+          bGrad.addColorStop(1, '#7DD3FC');
+          ctx.fillStyle = bGrad;
+          ctx.beginPath();
+          ctx.arc(0, -11, 14.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#0F172A';
+          ctx.beginPath(); ctx.arc(0, -13, 1.8, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(0, -7, 1.8, 0, Math.PI * 2); ctx.fill();
+
+          const armSwing = isJumping ? -0.75 : Math.sin(t * 6) * 0.25;
+          ctx.strokeStyle = '#78350F';
+          ctx.lineWidth = 2.6;
+          ctx.beginPath();
+          ctx.moveTo(-12, -14); ctx.lineTo(-21, -21 + armSwing * 10);
+          ctx.moveTo(12, -14);  ctx.lineTo(21, -21 - armSwing * 10);
+          ctx.stroke();
+          ctx.fillStyle = '#EF4444';
+          ctx.beginPath(); ctx.arc(-21, -21 + armSwing * 10, 3.3, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(21, -21 - armSwing * 10, 3.3, 0, Math.PI * 2); ctx.fill();
+
+          ctx.fillStyle = '#EF4444';
+          ctx.beginPath();
+          ctx.roundRect(-11, -26, 22, 6, 3);
+          ctx.fill();
+
+          const hGrad = ctx.createRadialGradient(-3, -36, 2, 0, -33, 13);
+          hGrad.addColorStop(0, '#FFFFFF');
+          hGrad.addColorStop(0.75, '#F0F9FF');
+          hGrad.addColorStop(1, '#93C5FD');
+          ctx.fillStyle = hGrad;
+          ctx.beginPath();
+          ctx.arc(0, -33, 11.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(251,113,133,0.48)';
+          ctx.beginPath(); ctx.arc(-6.5, -31.5, 2.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(6.5, -31.5, 2.5, 0, Math.PI * 2); ctx.fill();
+
+          ctx.fillStyle = '#0F172A';
+          if (blink) {
+            ctx.fillRect(-5.5, -35, 3.2, 1.2);
+            ctx.fillRect(2.3, -35, 3.2, 1.2);
+          } else {
+            ctx.beginPath(); ctx.arc(-4, -35, 1.9, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4, -35, 1.9, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath(); ctx.arc(-4.5, -35.6, 0.7, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(3.5, -35.6, 0.7, 0, Math.PI * 2); ctx.fill();
+          }
+
+          ctx.fillStyle = '#F97316';
+          ctx.beginPath();
+          ctx.moveTo(0, -33.5);
+          ctx.lineTo(8.5, -31.5);
+          ctx.lineTo(0, -30.5);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = '#DC2626';
+          ctx.beginPath();
+          ctx.arc(0, -40, 10.5, Math.PI, 0);
+          ctx.fill();
+          ctx.fillStyle = '#FCD34D';
+          ctx.beginPath();
+          ctx.roundRect(-11.5, -42, 23, 4.2, 2);
+          ctx.fill();
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(0, -51, 3.8, 0, Math.PI * 2);
+          ctx.fill();
+
+        } else if (biome === 'cloud') {
+          const meta = (typeof getMascotMeta === 'function' && state.profile) ? getMascotMeta(state.profile.mascot) : { color: '#FDBA74', accent: '#FB7185' };
+          const wave = Math.sin(t * 9) * 4;
+          ctx.fillStyle = '#2EF29B';
+          ctx.beginPath();
+          ctx.moveTo(-8, -22);
+          ctx.quadraticCurveTo(-22, -16 + wave, -25, -4 + wave);
+          ctx.lineTo(-4, -8);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = meta.color || '#FDBA74';
+          ctx.beginPath(); ctx.arc(-9, -36, 5.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(9, -36, 5.5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = meta.accent || '#FB7185';
+          ctx.beginPath(); ctx.arc(-9, -36, 2.8, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(9, -36, 2.8, 0, Math.PI * 2); ctx.fill();
+
+          const mGrad = ctx.createRadialGradient(-4, -26, 3, 0, -20, 18);
+          mGrad.addColorStop(0, '#FFFFFF');
+          mGrad.addColorStop(0.28, meta.color || '#FDBA74');
+          mGrad.addColorStop(1, '#7C3AED');
+          ctx.fillStyle = mGrad;
+          ctx.beginPath();
+          ctx.arc(0, -20, 15.5, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#160A33';
+          if (blink) {
+            ctx.fillRect(-7, -23, 4.5, 1.5);
+            ctx.fillRect(2.5, -23, 4.5, 1.5);
+          } else {
+            ctx.beginPath(); ctx.arc(-5, -23, 2.8, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(5, -23, 2.8, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath(); ctx.arc(-5.8, -24, 1.0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4.2, -24, 1.0, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.fillStyle = 'rgba(244,114,182,0.5)';
+          ctx.beginPath(); ctx.arc(-9.5, -19, 2.6, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(9.5, -19, 2.6, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#160A33';
+          ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.arc(0, -19.5, 3.2, 0.15, Math.PI - 0.15); ctx.stroke();
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath(); ctx.ellipse(-5.5, -4, 4.2, 3, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(5.5, -4, 4.2, 3, 0, 0, Math.PI * 2); ctx.fill();
+
+        } else {
+          if (isJumping) {
+            const fl = 14 + Math.sin(t * 45) * 6;
+            ctx.fillStyle = '#F59E0B';
+            ctx.beginPath();
+            ctx.moveTo(-6, -2); ctx.lineTo(6, -2); ctx.lineTo(0, fl); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#FEF08A';
+            ctx.beginPath();
+            ctx.moveTo(-3, -2); ctx.lineTo(3, -2); ctx.lineTo(0, fl * 0.65); ctx.closePath(); ctx.fill();
+          }
+          const wave = Math.sin(t * 11) * 5;
+          ctx.fillStyle = '#FFCD1F';
+          ctx.beginPath();
+          ctx.moveTo(-7, -26);
+          ctx.quadraticCurveTo(-24, -18 + wave, -30, -6 + wave);
+          ctx.lineTo(-5, -10);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = '#6D28D9';
+          ctx.beginPath();
+          ctx.roundRect(-10, -24, 20, 18, 7);
+          ctx.fill();
+          ctx.fillStyle = '#2EF29B';
+          ctx.fillRect(-4, -20, 8, 5);
+
+          const hel = ctx.createRadialGradient(-3, -36, 2, 0, -33, 13);
+          hel.addColorStop(0, '#FEF08A');
+          hel.addColorStop(0.6, '#F59E0B');
+          hel.addColorStop(1, '#B45309');
+          ctx.fillStyle = hel;
+          ctx.beginPath();
+          ctx.arc(0, -33, 12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#38BDF8';
+          ctx.beginPath();
+          ctx.roundRect(-7.5, -36.5, 15, 6.5, 3.2);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.75)';
+          ctx.fillRect(-5, -35.5, 6, 2);
+
+          ctx.fillStyle = '#FFCD1F';
+          ctx.beginPath(); ctx.roundRect(-8, -7, 6.5, 6, 2.5); ctx.fill();
+          ctx.beginPath(); ctx.roundRect(1.5, -7, 6.5, 6, 2.5); ctx.fill();
+        }
+
+        ctx.restore();
+      }
+
+      function renderFrame(ts) {
+        if (!canvas || !document.body.contains(canvas)) {
+          stop();
+          return;
+        }
+        const dt = lastTs ? Math.min(0.05, (ts - lastTs) * 0.001) : 0.016;
+        lastTs = ts;
+        elapsed += dt;
+
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        const rect = canvas.getBoundingClientRect();
+        const W = Math.max(300, Math.round(rect.width));
+        const H = Math.max(185, Math.round(rect.height));
+        if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
+          canvas.width = Math.round(W * dpr);
+          canvas.height = Math.round(H * dpr);
+        }
+
+        const ctx = canvas.getContext('2d');
+        ctx.save();
+        ctx.scale(dpr, dpr);
+
+        const biome = peakState.mountainId || 'snow';
+        if (biome !== curBiome) initWeather(biome);
+        goalSteps = Math.max(1, peakState.goalSteps || 15);
+        targetStep = Math.min(goalSteps, peakState.climbedSteps || 0);
+
+        let climberStep = targetStep;
+        let jumpArcY = 0;
+        let jumpPhase = 0;
+        if (jumpActive) {
+          jumpT += dt / 0.62;
+          if (jumpT >= 1) {
+            jumpActive = false;
+            jumpT = 1;
+            climberStep = jumpTo;
+            landSquash = 1.0;
+            spawnBurst(jumpTo, 32, biome, null);
+          } else {
+            const ease = 1 - Math.pow(1 - jumpT, 3);
+            climberStep = jumpFrom + (jumpTo - jumpFrom) * ease;
+            jumpPhase = jumpT;
+            jumpArcY = Math.sin(jumpT * Math.PI) * 58;
+          }
+        }
+        if (landSquash > 0) landSquash = Math.max(0, landSquash - dt * 3.8);
+        if (slipShake > 0) slipShake = Math.max(0, slipShake - dt * 2.6);
+        if (shieldFlash > 0) shieldFlash = Math.max(0, shieldFlash - dt * 2.0);
+        if (zoomPunch > 0) zoomPunch = Math.max(0, zoomPunch - dt * 2.4);
+
+        const desiredCam = Math.min(goalSteps - 0.6, Math.max(0, climberStep + 0.35));
+        camStep += (desiredCam - camStep) * Math.min(1, dt * 4.5);
+        const zoom = 1 + zoomPunch * 0.06;
+        const prog = Math.min(1, climberStep / goalSteps);
+
+        drawSkyAndBackdrop(ctx, W, H, elapsed, biome, prog);
+
+        const minVis = Math.max(0, Math.floor(camStep - 3));
+        const maxVis = Math.min(goalSteps, Math.ceil(camStep + 6));
+        const pts = [];
+        for (let i = minVis; i <= maxVis; i++) {
+          pts.push({ i, p: stepToScreen(i, W, H, camStep, zoom) });
+        }
+
+        for (let k = 0; k < pts.length - 1; k++) {
+          const a = pts[k].p;
+          const b = pts[k + 1].p;
+          const done = pts[k + 1].i <= targetStep;
+          ctx.save();
+          ctx.strokeStyle = done
+            ? (biome === 'snow' ? '#67E8F9' : biome === 'cloud' ? '#FDE047' : '#FFCD1F')
+            : 'rgba(255,255,255,0.22)';
+          ctx.lineWidth = (done ? 3.5 : 2.2) * ((a.scale + b.scale) * 0.5);
+          ctx.setLineDash(done ? [] : [6, 6]);
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.quadraticCurveTo((a.x + b.x) * 0.5, (a.y + b.y) * 0.5 - 8, b.x, b.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          if (biome === 'everest') {
+            const flagCols = ['#EF4444', '#FFCD1F', '#38BDF8', '#2EF29B', '#FFFFFF'];
+            for (let f = 1; f <= 3; f++) {
+              const u = f / 4;
+              const fx = a.x + (b.x - a.x) * u;
+              const fy = a.y + (b.y - a.y) * u - 4 + Math.sin(elapsed * 7 + f + k) * 2.5;
+              ctx.fillStyle = flagCols[(k * 3 + f) % flagCols.length];
+              ctx.beginPath();
+              ctx.moveTo(fx, fy);
+              ctx.lineTo(fx + 5 * a.scale, fy + 2);
+              ctx.lineTo(fx + 2 * a.scale, fy + 8 * a.scale);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+          ctx.restore();
+        }
+
+        for (let k = pts.length - 1; k >= 0; k--) {
+          drawLedge(ctx, pts[k].p, pts[k].i, targetStep, goalSteps, biome, elapsed);
+        }
+
+        const cPos = stepToScreen(climberStep, W, H, camStep, zoom);
+        const cy = cPos.y - jumpArcY * cPos.scale;
+        if (jumpActive) {
+          trail.push({ x: cPos.x, y: cy - 14 * cPos.scale, life: 1.0 });
+        }
+        for (let i = trail.length - 1; i >= 0; i--) {
+          trail[i].life -= dt * 2.8;
+          if (trail[i].life <= 0) trail.splice(i, 1);
+        }
+        if (trail.length > 1) {
+          for (let i = 1; i < trail.length; i++) {
+            const a = trail[i - 1], b = trail[i];
+            ctx.strokeStyle = biome === 'snow'
+              ? `rgba(103,232,249,${(b.life * 0.85).toFixed(2)})`
+              : biome === 'cloud'
+                ? `rgba(253,224,71,${(b.life * 0.85).toFixed(2)})`
+                : `rgba(255,205,31,${(b.life * 0.9).toFixed(2)})`;
+            ctx.lineWidth = Math.max(1.5, b.life * 7);
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+
+        for (let i = shockwaves.length - 1; i >= 0; i--) {
+          const sw = shockwaves[i];
+          sw.life -= dt * 1.9;
+          sw.r += dt * 105;
+          if (sw.life <= 0) { shockwaves.splice(i, 1); continue; }
+          const sp = stepToScreen(sw.step, W, H, camStep, zoom);
+          ctx.strokeStyle = sw.color;
+          ctx.globalAlpha = Math.max(0, sw.life * 0.85);
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.ellipse(sp.x, sp.y, sw.r * sp.scale, sw.r * 0.36 * sp.scale, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+
+        drawClimber(ctx, cPos.x, cy, cPos.scale, biome, elapsed, jumpActive, jumpPhase, landSquash, slipShake);
+
+        for (let i = burstParticles.length - 1; i >= 0; i--) {
+          const bp = burstParticles[i];
+          bp.life -= dt * bp.decay;
+          if (bp.life <= 0) { burstParticles.splice(i, 1); continue; }
+          bp.ox += bp.vx * dt;
+          bp.oy += bp.vy * dt;
+          bp.vy += 180 * dt;
+          const sp = stepToScreen(bp.step, W, H, camStep, zoom);
+          ctx.globalAlpha = Math.max(0, bp.life);
+          ctx.fillStyle = bp.color;
+          ctx.beginPath();
+          ctx.arc(sp.x + bp.ox, sp.y + bp.oy, bp.r * bp.life, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+
+        for (let i = floatTexts.length - 1; i >= 0; i--) {
+          const ft = floatTexts[i];
+          ft.life -= dt * 1.15;
+          ft.oy -= dt * 34;
+          if (ft.life <= 0) { floatTexts.splice(i, 1); continue; }
+          const sp = stepToScreen(ft.step, W, H, camStep, zoom);
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, ft.life);
+          ctx.font = '800 13px "Plus Jakarta Sans", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#0F172A';
+          ctx.fillText(ft.text, sp.x + 1, sp.y + ft.oy + 1);
+          ctx.fillStyle = ft.color || '#34F5A5';
+          ctx.fillText(ft.text, sp.x, sp.y + ft.oy);
+          ctx.restore();
+        }
+
+        if (biome === 'snow') {
+          weather.forEach(w => {
+            w.y += w.vy * dt;
+            w.x += (w.vx + Math.sin(elapsed * 1.8 + w.sway) * 0.04) * dt;
+            if (w.y > 1.05) { w.y = -0.05; w.x = Math.random(); }
+            if (w.x < -0.05) w.x = 1.05;
+            if (w.x > 1.05) w.x = -0.05;
+            ctx.fillStyle = `rgba(255,255,255,${w.alpha.toFixed(2)})`;
+            ctx.beginPath();
+            ctx.arc(w.x * W, w.y * H, w.r, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        } else if (biome === 'cloud') {
+          weather.forEach(w => {
+            w.y += w.vy * dt;
+            w.x += (w.vx + Math.sin(elapsed * 1.5 + w.sway) * 0.02) * dt;
+            if (w.y < -0.05) { w.y = 1.05; w.x = Math.random(); }
+            if (w.x > 1.05) w.x = -0.05;
+            ctx.fillStyle = `rgba(253,230,138,${w.alpha.toFixed(2)})`;
+            ctx.beginPath();
+            ctx.arc(w.x * W, w.y * H, w.r, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        } else {
+          weather.forEach(w => {
+            w.x += w.vx * dt;
+            w.y += w.vy * dt;
+            if (w.x < -0.15) { w.x = 1.15; w.y = Math.random(); }
+            if (w.y > 1.1) w.y = -0.05;
+            ctx.strokeStyle = `rgba(224,242,254,${(w.alpha * 0.55).toFixed(2)})`;
+            ctx.lineWidth = 1.3;
+            ctx.beginPath();
+            ctx.moveTo(w.x * W, w.y * H);
+            ctx.lineTo(w.x * W + w.len, w.y * H - w.len * 0.18);
+            ctx.stroke();
+          });
+        }
+
+        ctx.restore();
+        rafId = requestAnimationFrame(renderFrame);
+      }
+
+      function stop() {
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        lastTs = 0;
+      }
+
+      return {
+        reset(biome, total) {
+          stop();
+          goalSteps = Math.max(1, total || 15);
+          camStep = 0;
+          targetStep = 0;
+          jumpActive = false;
+          jumpFrom = 0;
+          jumpTo = 0;
+          jumpT = 0;
+          landSquash = 0;
+          slipShake = 0;
+          shieldFlash = 0;
+          zoomPunch = 0;
+          trail = [];
+          burstParticles = [];
+          shockwaves = [];
+          floatTexts = [];
+          initWeather(biome || 'snow');
+        },
+        triggerJump(fromStep, toStep, labelText) {
+          jumpFrom = fromStep;
+          jumpTo = toStep;
+          jumpT = 0;
+          jumpActive = true;
+          zoomPunch = 1.0;
+          spawnBurst(fromStep, 16, peakState.mountainId || 'snow', labelText || '');
+        },
+        triggerSlip(hasShield) {
+          slipShake = 1.0;
+          if (hasShield) shieldFlash = 1.0;
+        },
+        mount() {
+          const el = document.getElementById('peak-stage-canvas');
+          if (!el) return;
+          canvas = el;
+          if (!weather.length || curBiome !== (peakState.mountainId || 'snow')) {
+            initWeather(peakState.mountainId || 'snow');
+          }
+          if (!rafId) {
+            lastTs = 0;
+            rafId = requestAnimationFrame(renderFrame);
+          }
+        },
+        stop
+      };
+    })();
 
     function getPeakPool() {
       const topics = peakState.selectedTopics.length ? peakState.selectedTopics : ['education'];
@@ -6273,6 +7213,7 @@
       matchState.screen = 'hub';
       blastState.screen = 'hub';
       peakState.screen = 'play';
+      peakStageEngine.reset(peakState.mountainId, peakState.goalSteps);
       prepareNextPeakQuestion();
       render();
     }
@@ -6326,7 +7267,11 @@
         const basePts = 100 + Math.min(peakState.combo - 1, 6) * 20;
         const gained = peakState.activeDouble ? basePts * 2 : basePts;
         peakState.score += gained;
+        const prevPeakStep = peakState.climbedSteps;
         peakState.climbedSteps = Math.min(peakState.goalSteps, peakState.climbedSteps + 1);
+        const mAlt = (PEAK_MOUNTAINS[peakState.mountainId] || PEAK_MOUNTAINS.snow).alt;
+        const gainMeters = Math.round(mAlt / Math.max(1, peakState.goalSteps));
+        peakStageEngine.triggerJump(prevPeakStep, peakState.climbedSteps, `+${gainMeters}m · +${gained}đ`);
 
         // Reward a random Power-Up every 4-streak!
         let bonusNote = '';
@@ -6380,9 +7325,10 @@
             prepareNextPeakQuestion();
             render();
           }
-        }, 650);
+        }, 920);
       } else {
         peakState.lastCorrect = false;
+        peakStageEngine.triggerSlip(peakState.activeShield);
         gameSfx.wrong();
         // Spaced Repetition: re-queue this missed word 2-3 turns later so learner truly masters it!
         const insertAt = Math.min(peakState.queue.length, 2);
@@ -6503,17 +7449,12 @@
       const item = peakState.currentItem;
       const w = item ? item.wordObj : null;
 
-      // Climber position along SVG mountain slope (from x=36,y=118 up to summit x=260,y=24)
-      const prog = peakState.climbedSteps / Math.max(1, peakState.goalSteps);
-      const climberX = Math.round(36 + prog * 224);
-      const climberY = Math.round(118 - prog * 94 - Math.sin(prog * Math.PI) * 14);
-
       return `
-        <section class="max-w-3xl mx-auto rounded-3xl bg-gradient-to-br from-[#0F172A] via-[#1E1B4B] to-[#3B0764] p-4 sm:p-6 text-white shadow-2xl border border-purple-400/25 space-y-4">
+        <section class="max-w-3xl mx-auto rounded-3xl bg-gradient-to-br ${mCfg.arenaBg || 'from-[#0F172A] via-[#1E1B4B] to-[#3B0764]'} p-4 sm:p-6 text-white shadow-2xl border ${mCfg.borderCls || 'border-purple-400/25'} space-y-4">
           <!-- Top HUD -->
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-3 py-1.5 rounded-xl bg-white/12 border border-white/15 text-xs font-black text-[#FFCD1F]">
+              <span class="px-3 py-1.5 rounded-xl bg-white/12 border border-white/15 text-xs font-black ${mCfg.badgeColor || 'text-[#FFCD1F]'}">
                 ${mCfg.name} · ${curAlt.toLocaleString()}m
               </span>
               <span class="px-3 py-1.5 rounded-xl bg-white/10 text-xs font-black text-[#34F5A5]">
@@ -6527,28 +7468,29 @@
             </div>
           </div>
 
-          <!-- Interactive SVG Mountain Trail Map -->
-          <div class="rounded-2xl bg-black/25 border border-white/10 p-3 relative overflow-hidden">
-            <div class="flex items-center justify-between text-[11px] font-bold text-purple-200 mb-1">
-              <span>Chặng ${peakState.climbedSteps}/${peakState.goalSteps}</span>
-              <span class="text-[#34F5A5]">${pct}% đến đỉnh</span>
+          <!-- 60fps Flycam 3-Biome Animated Mountain Stage -->
+          <div class="rounded-2xl bg-black/35 border border-white/15 relative overflow-hidden shadow-inner">
+            <canvas id="peak-stage-canvas" class="block w-full h-52 sm:h-60"></canvas>
+
+            <!-- Top-Left Flycam Telemetry Corner -->
+            <div class="pointer-events-none absolute top-2.5 left-2.5 flex flex-col gap-1">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/65 backdrop-blur-sm border border-white/15 text-[11px] font-extrabold text-white">
+                <span class="w-2 h-2 rounded-full bg-[#2EF29B] animate-pulse"></span>
+                ${mCfg.biome || mCfg.name}
+              </span>
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-slate-950/55 text-[11px] font-bold text-slate-200 w-fit">
+                Chặng ${peakState.climbedSteps}/${peakState.goalSteps}
+              </span>
             </div>
-            <svg class="w-full h-28 sm:h-32" viewBox="0 0 320 130" preserveAspectRatio="none">
-              <defs>
-                <linearGradient id="pkMtn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#6D28D9" stop-opacity="0.75"/><stop offset="100%" stop-color="#0F172A" stop-opacity="0.95"/></linearGradient>
-              </defs>
-              <!-- Distant mountain silhouettes -->
-              <polygon points="0,130 90,55 170,130" fill="#312E81" opacity="0.5"/>
-              <polygon points="140,130 260,22 320,130" fill="url(#pkMtn)"/>
-              <!-- Winding climbing trail -->
-              <path d="M36 118 Q 145 56, 260 24" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="4" stroke-dasharray="6 5" stroke-linecap="round"/>
-              <!-- Golden Summit Flag -->
-              <line x1="260" y1="24" x2="260" y2="6" stroke="#FFCD1F" stroke-width="2.5"/>
-              <polygon points="260,6 278,11 260,16" fill="#FFCD1F"/>
-              <!-- Climber Glowing Marker -->
-              <circle cx="${climberX}" cy="${climberY}" r="11" fill="#2EF29B" opacity="0.28"/>
-              <circle cx="${climberX}" cy="${climberY}" r="6.5" fill="#2EF29B" stroke="#FFFFFF" stroke-width="2"/>
-            </svg>
+
+            <!-- Top-Right Altitude & Progress Corner -->
+            <div class="pointer-events-none absolute top-2.5 right-2.5 rounded-xl bg-slate-950/65 backdrop-blur-sm border border-white/15 px-3 py-1.5 text-right min-w-[118px]">
+              <div class="text-[11px] font-black ${mCfg.badgeColor || 'text-[#FFCD1F]'}">${curAlt.toLocaleString()}m / ${mCfg.alt.toLocaleString()}m</div>
+              <div class="w-full h-1.5 rounded-full bg-white/15 overflow-hidden mt-1">
+                <div class="h-full rounded-full bg-gradient-to-r from-[#38BDF8] to-[#2EF29B] transition-all duration-500" style="width:${pct}%"></div>
+              </div>
+              <div class="text-[10px] font-extrabold text-[#34F5A5] mt-0.5">${pct}% đến đỉnh</div>
+            </div>
           </div>
 
           <!-- Power-Ups Bar -->
@@ -6736,6 +7678,11 @@
       }
       updateHeaderUI();
       if (window.lucide) lucide.createIcons();
+      if (state.view === 'games' && peakState.screen === 'play') {
+        peakStageEngine.mount();
+      } else {
+        peakStageEngine.stop();
+      }
 
       const matchSearchEl = document.getElementById('match-custom-search');
       if (matchSearchEl) {
